@@ -1,7 +1,12 @@
 
 'use client';
 
-import { AppLayout } from '@/components/app-layout';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -9,17 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Upload,
-  Loader2,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useState } from 'react';
-import { useRunFlow } from '@genkit-ai/next/client';
-import { analyzeCreditReport } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { analyzeCreditReport } from '@/ai/flows/credit-report-analyzer';
+import { useFlow } from '@genkit-ai/next/client';
+import { Loader2, Upload } from 'lucide-react';
+import { useState } from 'react';
 
 function CreditReportUploader({
   onAnalysisComplete,
@@ -27,7 +28,7 @@ function CreditReportUploader({
   onAnalysisComplete: (html: string) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const { run, loading, error } = useRunFlow(analyzeCreditReport);
+  const [runAnalysis, { loading, error }] = useFlow(analyzeCreditReport);
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,13 +52,13 @@ function CreditReportUploader({
     reader.readAsDataURL(file);
     reader.onload = async () => {
       const creditReportDataUri = reader.result as string;
-      const result = await run({ creditReportDataUri });
+      const result = await runAnalysis({ creditReportDataUri });
       if (result?.analysisHtml) {
         onAnalysisComplete(result.analysisHtml);
       }
     };
-    reader.onerror = (error) => {
-      console.error('Error reading file:', error);
+    reader.onerror = (readError) => {
+      console.error('Error reading file:', readError);
       toast({
         variant: 'destructive',
         title: 'File Read Error',
@@ -123,18 +124,16 @@ function AnalysisDisplay({ htmlContent }: { htmlContent: string }) {
   );
 }
 
-export default function CreditAnalysisPage() {
+export function CreditReportAnalysis() {
   const [analysisHtml, setAnalysisHtml] = useState<string | null>(null);
 
   return (
-    <AppLayout>
-      <div className="space-y-8 max-w-5xl mx-auto">
-        {!analysisHtml ? (
-          <CreditReportUploader onAnalysisComplete={setAnalysisHtml} />
-        ) : (
-          <AnalysisDisplay htmlContent={analysisHtml} />
-        )}
-      </div>
-    </AppLayout>
+    <div className="space-y-8 max-w-5xl mx-auto">
+      {!analysisHtml ? (
+        <CreditReportUploader onAnalysisComplete={setAnalysisHtml} />
+      ) : (
+        <AnalysisDisplay htmlContent={analysisHtml} />
+      )}
+    </div>
   );
 }
