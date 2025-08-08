@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
-import { useRunFlow } from '@genkit-ai/next/client';
+import { useRunFlow } from '@genkit-ai/next/use-flow';
 import { analyzeCreditReport } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
