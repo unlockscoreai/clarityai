@@ -1,5 +1,7 @@
 import { AppLayout } from "@/components/app-layout";
-import { CreditReportAnalysis } from "@/components/reports/credit-report-analysis";
+import { CreditAnalysisDisplay } from "@/components/reports/credit-analysis-display";
+import { CreditReportUpload } from "@/components/reports/credit-report-upload";
+import { Separator } from "@/components/ui/separator";
 
 export default function ReportsPage() {
   return (
@@ -11,7 +13,9 @@ export default function ReportsPage() {
             Upload and manage your credit report analyses.
           </p>
         </div>
-        <CreditReportAnalysis />
+        <CreditReportUpload />
+        <Separator />
+        <CreditAnalysisDisplay />
       </div>
     </AppLayout>
   );

@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 
-export function CreditReportAnalysis() {
+export function CreditReportUpload() {
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
