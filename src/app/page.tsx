@@ -3,7 +3,7 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowRight, BarChart, FileText, ShieldCheck } from "lucide-react";
+import { ArrowRight, BarChart, FileText, ShieldCheck, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useFlow } from "@genkit-ai/next/client";
+import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 
 function LogoIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -52,9 +57,133 @@ const features = [
     },
 ];
 
+function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
+  const router = useRouter();
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [reportFile, setReportFile] = useState<File | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzeCreditReportOutput | null>(null);
+  const { run: startAnalysis, loading } = useFlow(analyzeCreditReport);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setReportFile(e.target.files[0]);
+    }
+  };
+
+  const fileToDataUri = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!reportFile) {
+      // Add user-facing error handling
+      console.error("No report file selected");
+      return;
+    }
+
+    try {
+      const creditReportDataUri = await fileToDataUri(reportFile);
+      const input: AnalyzeCreditReportInput = { creditReportDataUri };
+      const result = await startAnalysis(input);
+      if (result) {
+        setAnalysisResult(result);
+      }
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      // Add user-facing error handling
+    }
+  };
+  
+  const handleCreateAccount = () => {
+    // In a real app, you would pass the user data and maybe the analysis ID
+    // to the signup page, e.g., via query params or state management.
+    router.push('/signup');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 p-8">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <h2 className="text-2xl font-semibold font-headline">Analyzing Your Report...</h2>
+        <p className="text-muted-foreground text-center">This may take a moment. We're generating your personalized credit insights.</p>
+      </div>
+    );
+  }
+
+  if (analysisResult) {
+    return (
+      <>
+        <DialogHeader>
+          <DialogTitle>Your Analysis Snapshot is Ready!</DialogTitle>
+          <DialogDescription>
+            Here's a glimpse of your results. Create an account to view the full, detailed breakdown and start disputing items.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="prose prose-sm max-w-none rounded-lg border bg-secondary/50 p-4" dangerouslySetInnerHTML={{ __html: analysisResult.analysisHtml.substring(0, 1000) + '...' }} />
+          <div className="space-y-2">
+            <Label htmlFor="password">Create a Password</Label>
+            <Input id="password" type="password" placeholder="••••••••" />
+          </div>
+        </div>
+        <div className="flex justify-end">
+            <Button onClick={handleCreateAccount} className="font-bold">
+                See Full Analysis & Create Account <ArrowRight className="ml-2"/>
+            </Button>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Get Your Free AI Credit Analysis</DialogTitle>
+        <DialogDescription>
+          Provide your details and upload your credit report PDF to get started.
+        </DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="space-y-4 py-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="first-name">First Name</Label>
+            <Input id="first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="last-name">Last Name</Label>
+            <Input id="last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="credit-report">Credit Report (PDF)</Label>
+          <Input id="credit-report" type="file" accept=".pdf" onChange={handleFileChange} required />
+        </div>
+        <div className="flex justify-end">
+            <Button type="submit" disabled={!reportFile || loading} className="font-bold">
+                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : 'Get My Analysis'}
+            </Button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 
 export default function HomePage() {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -82,9 +211,16 @@ export default function HomePage() {
                         <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl">
                             Get a free, in-depth analysis of your credit report and a personalized action plan to boost your score. No credit card required.
                         </p>
-                        <Button size="lg" className="font-bold" onClick={() => router.push('/signup')}>
-                            Get Your Free Analysis <ArrowRight className="ml-2"/>
-                        </Button>
+                         <Dialog open={open} onOpenChange={setOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="lg" className="font-bold">
+                                    Get Your Free Analysis <ArrowRight className="ml-2"/>
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                               <FreeAnalysisForm setOpen={setOpen} />
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
             </section>
