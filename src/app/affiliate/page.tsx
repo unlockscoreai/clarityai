@@ -1,8 +1,49 @@
 import { AppLayout } from "@/components/app-layout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Copy } from "lucide-react";
+
+const referrals = [
+    {
+        name: "John Doe",
+        type: "Client",
+        status: "Active",
+        joinDate: "2024-07-01",
+        earnings: "$50.00",
+    },
+    {
+        name: "Jane Smith",
+        type: "Affiliate",
+        status: "Active",
+        joinDate: "2024-06-15",
+        earnings: "$125.50",
+    },
+    {
+        name: "Michael Brown",
+        type: "Client",
+        status: "Pending",
+        joinDate: "2024-07-20",
+        earnings: "$0.00",
+    },
+    {
+        name: "Emily White",
+        type: "Client",
+        status: "Active",
+        joinDate: "2024-05-10",
+        earnings: "$75.00",
+    },
+    {
+        name: "David Green",
+        type: "Affiliate",
+        status: "Inactive",
+        joinDate: "2024-03-22",
+        earnings: "$25.00",
+    },
+];
+
 
 export default function AffiliatePage() {
   return (
@@ -58,6 +99,41 @@ export default function AffiliatePage() {
                 </CardContent>
             </Card>
         </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Client Management</CardTitle>
+                <CardDescription>A list of your personally referred clients and affiliates.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Join Date</TableHead>
+                            <TableHead className="text-right">Earnings</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {referrals.map((referral) => (
+                            <TableRow key={referral.name}>
+                                <TableCell className="font-medium">{referral.name}</TableCell>
+                                <TableCell>{referral.type}</TableCell>
+                                <TableCell>
+                                    <Badge variant={referral.status === 'Active' ? 'secondary' : 'outline'}>
+                                        {referral.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{referral.joinDate}</TableCell>
+                                <TableCell className="text-right">{referral.earnings}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
 
       </div>
     </AppLayout>
