@@ -125,7 +125,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="prose prose-sm max-w-none rounded-lg border bg-secondary/50 p-4" dangerouslySetInnerHTML={{ __html: analysis.analysisHtml.substring(0, 1000) + '...' }} />
+          <div className="prose prose-sm max-w-none rounded-lg border bg-secondary/50 p-4 h-64 overflow-y-auto" dangerouslySetInnerHTML={{ __html: analysis.analysisHtml }} />
           <div className="space-y-2">
             <Label htmlFor="password">Create a Password</Label>
             <Input id="password" type="password" placeholder="••••••••" />
@@ -213,7 +213,7 @@ export default function HomePage() {
                                     Get Your Free Analysis <ArrowRight className="ml-2"/>
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]">
+                            <DialogContent className="sm:max-w-xl">
                                <FreeAnalysisForm setOpen={setOpen} />
                             </DialogContent>
                         </Dialog>
