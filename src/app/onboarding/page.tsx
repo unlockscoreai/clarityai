@@ -18,12 +18,14 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UploadCloud, FileCheck, Info, CreditCard } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function OnboardingPage() {
   const [credits, setCredits] = useState(0); // Mock credits state. 0 for disabled, >0 for enabled.
   const [autoMailer, setAutoMailer] = useState(false);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [mailFile, setMailFile] = useState<File | null>(null);
+  const router = useRouter();
 
   const affiliateName = "Jane Doe"; // Mock affiliate name
 
@@ -45,6 +47,9 @@ export default function OnboardingPage() {
     console.log("Form submitted");
     // In a real app, you would make an API call to your backend to handle the files and data.
     // If automailer is enabled, you would trigger the doupost service.
+    
+    // Redirect to the disputes page to begin the process.
+    router.push('/disputes');
   };
 
   return (
@@ -189,7 +194,7 @@ export default function OnboardingPage() {
             </CardContent>
             <CardFooter>
                  <Button type="submit" className="w-full font-bold">
-                    Complete Onboarding & Review File
+                    Complete Onboarding & Start Disputes
                  </Button>
             </CardFooter>
           </Card>
