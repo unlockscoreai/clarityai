@@ -1,13 +1,14 @@
+
 "use client";
 
 import { useState } from "react";
-import { useGenkit } from "@genkit-ai/next/client";
+import { useFlow } from "@genkit-ai/next/client";
 import { analyzeCreditReport, AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, UploadCloud, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2, UploadCloud, CheckCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
@@ -24,21 +25,23 @@ export function CreditReportAnalysis() {
     reader.onerror = error => reject(error);
   });
 
-  const [analyze, analyzing] = useGenkit(
+  const {run: analyze, running: analyzing} = useFlow(
     analyzeCreditReport,
-    async (result) => {
-      setAnalysis(result);
-      toast({
-        title: "Analysis Complete",
-        description: "Your credit report has been successfully analyzed.",
-      });
-    },
-    (err) => {
-      toast({
-        title: "Analysis Failed",
-        description: (err as Error).message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
+    {
+      onSuccess: (result) => {
+        setAnalysis(result);
+        toast({
+          title: "Analysis Complete",
+          description: "Your credit report has been successfully analyzed.",
+        });
+      },
+      onError: (err) => {
+        toast({
+          title: "Analysis Failed",
+          description: (err as Error).message || "An unexpected error occurred.",
+          variant: "destructive",
+        });
+      }
     }
   );
 
