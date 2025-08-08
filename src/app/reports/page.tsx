@@ -10,130 +10,80 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  Upload,
-  Loader2,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
-import { useRunFlow } from '@genkit-ai/next/use-flow';
-import { analyzeCreditReport } from '@/ai/flows/credit-report-analyzer';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-
-function CreditReportUploader({
-  onAnalysisComplete,
-}: {
-  onAnalysisComplete: (html: string) => void;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const { run, loading, error } = useRunFlow(analyzeCreditReport);
-  const { toast } = useToast();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!file) {
-      toast({
-        variant: 'destructive',
-        title: 'No file selected',
-        description: 'Please upload your credit report PDF.',
-      });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-      const creditReportDataUri = reader.result as string;
-      const result = await run({ creditReportDataUri });
-      if (result?.analysisHtml) {
-        onAnalysisComplete(result.analysisHtml);
-      }
-    };
-    reader.onerror = (error) => {
-      console.error('Error reading file:', error);
-      toast({
-        variant: 'destructive',
-        title: 'File Read Error',
-        description: 'Could not read the selected file.',
-      });
-    };
-  };
-
-  if (error) {
-    toast({
-      variant: 'destructive',
-      title: 'Analysis Failed',
-      description: error.message,
-    });
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Upload Your Credit Report</CardTitle>
-        <CardDescription>
-          Upload your latest credit report PDF to get an updated analysis.
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="credit-report">Credit Report PDF</Label>
-            <Input
-              id="credit-report"
-              type="file"
-              onChange={handleFileChange}
-              accept=".pdf"
-              required
-            />
-          </div>
-          <Button type="submit" disabled={loading} className="w-full">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 animate-spin" /> Analyzing...
-              </>
-            ) : (
-              <>
-                <Upload className="mr-2" />
-                Analyze Report
-              </>
-            )}
-          </Button>
-        </CardContent>
-      </form>
-    </Card>
-  );
-}
-
-function AnalysisDisplay({ htmlContent }: { htmlContent: string }) {
-  // In a real app, you would sanitize this HTML.
-  // For this prototype, we trust the source (our own AI flow).
-  return (
-    <div
-      className="prose dark:prose-invert max-w-none"
-      dangerouslySetInnerHTML={{ __html: htmlContent }}
-    />
-  );
-}
+import Link from 'next/link';
 
 export default function CreditAnalysisPage() {
-  const [analysisHtml, setAnalysisHtml] = useState<string | null>(null);
 
   return (
     <AppLayout>
       <div className="space-y-8 max-w-5xl mx-auto">
-        {!analysisHtml ? (
-          <CreditReportUploader onAnalysisComplete={setAnalysisHtml} />
-        ) : (
-          <AnalysisDisplay htmlContent={analysisHtml} />
-        )}
+         <Card>
+            <CardHeader>
+                <CardTitle>Your Credit Analysis</CardTitle>
+                <CardDescription>Generated on: 2025-08-08</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <section id="snapshot-metrics">
+                    <h2 className="text-xl font-semibold font-headline mb-4">Snapshot</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-center">
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Derogatory Items</p>
+                            <p className="text-2xl font-bold">3</p>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Open Accounts</p>
+                            <p className="text-2xl font-bold">7</p>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Total Accounts</p>
+                            <p className="text-2xl font-bold">12</p>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Hard Inquiries (12mo)</p>
+                            <p className="text-2xl font-bold">5</p>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Credit Utilization</p>
+                            <p className="text-2xl font-bold">42%</p>
+                        </div>
+                        <div className="p-4 bg-secondary rounded-lg">
+                            <p className="text-sm text-muted-foreground">Oldest Account</p>
+                            <p className="text-2xl font-bold">3.0 yrs</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="analysis-summary">
+                    <h2 className="text-xl font-semibold font-headline my-4">Analysis Summary</h2>
+                    <p className="text-muted-foreground">Your credit profile is on a solid track thanks to strong recent payment activity, but several derogatory items and high utilization are weighing on your score. The most immediate lift we can target is credit utilization — lowering this under 30% could produce a noticeable improvement within 1–2 billing cycles. The collection and charged-off account both have missing creditor contact details in the report — those are high-probability disputes.</p>
+                </section>
+
+                <section id="action-plan">
+                    <h2 className="text-xl font-semibold font-headline my-4">Your Personalized Action Plan</h2>
+                    <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+                        <li>Pay down your Visa by $1,500 to get utilization &lt;30%. (High impact / medium effort)</li>
+                        <li>Request validation for Collection (Acct: ABC) — evidence of missing original creditor details → High success chance (we recommend dispute + certified mail).</li>
+                        <li>Dispute duplicate reporting (Acct: XYZ appears twice on different bureaus). (Moderate success chance)</li>
+                        <li>Avoid new credit applications for 6–12 months to let hard inquiry impact fade.</li>
+                        <li>Consider a credit-builder installment loan to diversify accounts (low cost, long-term benefit).</li>
+                    </ol>
+                </section>
+                
+                <section id="items-to-challenge">
+                    <h2 className="text-xl font-semibold font-headline my-4">Items We Recommend Challenging</h2>
+                    <Button asChild>
+                        <Link href="/disputes">
+                            <FileText className="mr-2"/>
+                            Go to Dispute Center
+                        </Link>
+                    </Button>
+                </section>
+
+            </CardContent>
+         </Card>
       </div>
     </AppLayout>
   );
