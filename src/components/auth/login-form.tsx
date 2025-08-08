@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Chrome } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 function AppleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -37,10 +39,30 @@ function AppleIcon(props: React.SVGProps<SVGSVGElement>) {
 
 export function LoginForm() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    router.push('/dashboard');
+    
+    if (email === "support@unlockscoreai.com" && password === "GMTAcademy23$") {
+      // Admin login
+      toast({
+        title: "Admin Login Successful",
+        description: "Welcome, admin!",
+      });
+      router.push('/dashboard');
+    } else if (email && password) {
+      // Regular user login
+      router.push('/dashboard');
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Login Failed",
+            description: "Please check your email and password.",
+        });
+    }
   }
 
   return (
@@ -62,11 +84,11 @@ export function LoginForm() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="name@example.com" required />
+            <Input id="email" type="email" placeholder="name@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required />
+            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           <Button type="submit" className="w-full font-bold">
             Sign In
