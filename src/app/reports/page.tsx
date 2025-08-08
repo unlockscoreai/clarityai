@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 
 function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const { run: startAnalysis, loading } = useFlow(analyzeCreditReport);
+  const [startAnalysis, , loading] = useFlow(analyzeCreditReport);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -122,11 +122,15 @@ function AnalysisDisplay({ analysis }: { analysis: AnalyzeCreditReportOutput | n
 export default function CreditAnalysisPage() {
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
 
+  const handleAnalysisComplete = (newAnalysis: AnalyzeCreditReportOutput) => {
+    setAnalysis(newAnalysis);
+  };
+
   return (
     <AppLayout>
       <div className="grid gap-8 md:grid-cols-3">
         <div className="md:col-span-1">
-          <CreditReportUploader onAnalysisComplete={setAnalysis} />
+          <CreditReportUploader onAnalysisComplete={handleAnalysisComplete} />
         </div>
         <div className="md:col-span-2">
             <AnalysisDisplay analysis={analysis} />

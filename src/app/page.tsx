@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useFlow } from "@genkit-ai/next/client";
+import { useFlow } from '@genkit-ai/next/client';
 import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,8 +63,8 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalyzeCreditReportOutput | null>(null);
-  const { run: startAnalysis, loading } = useFlow(analyzeCreditReport);
+  
+  const [startAnalysis, analysis, loading] = useFlow(analyzeCreditReport);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -92,10 +92,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
     try {
       const creditReportDataUri = await fileToDataUri(reportFile);
       const input: AnalyzeCreditReportInput = { creditReportDataUri };
-      const result = await startAnalysis(input);
-      if (result) {
-        setAnalysisResult(result);
-      }
+      await startAnalysis(input);
     } catch (error) {
       console.error("Analysis failed:", error);
       // Add user-facing error handling
@@ -118,7 +115,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
     );
   }
 
-  if (analysisResult) {
+  if (analysis) {
     return (
       <>
         <DialogHeader>
@@ -128,7 +125,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="prose prose-sm max-w-none rounded-lg border bg-secondary/50 p-4" dangerouslySetInnerHTML={{ __html: analysisResult.analysisHtml.substring(0, 1000) + '...' }} />
+          <div className="prose prose-sm max-w-none rounded-lg border bg-secondary/50 p-4" dangerouslySetInnerHTML={{ __html: analysis.analysisHtml.substring(0, 1000) + '...' }} />
           <div className="space-y-2">
             <Label htmlFor="password">Create a Password</Label>
             <Input id="password" type="password" placeholder="••••••••" />
@@ -263,3 +260,4 @@ export default function HomePage() {
     </div>
   );
 }
+
