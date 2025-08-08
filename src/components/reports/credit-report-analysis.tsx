@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useFlow } from "@genkit-ai/next/client";
+import { runFlow } from "@genkit-ai/next/client";
 import { analyzeCreditReport, AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 export function CreditReportAnalysis() {
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const { toast } = useToast();
 
   const toBase64 = (file: File) => new Promise<string>((resolve, reject) => {
@@ -24,26 +25,6 @@ export function CreditReportAnalysis() {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = error => reject(error);
   });
-
-  const {run: analyze, running: analyzing} = useFlow(
-    analyzeCreditReport,
-    {
-      onSuccess: (result) => {
-        setAnalysis(result);
-        toast({
-          title: "Analysis Complete",
-          description: "Your credit report has been successfully analyzed.",
-        });
-      },
-      onError: (err) => {
-        toast({
-          title: "Analysis Failed",
-          description: (err as Error).message || "An unexpected error occurred.",
-          variant: "destructive",
-        });
-      }
-    }
-  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -62,8 +43,24 @@ export function CreditReportAnalysis() {
       return;
     }
     setAnalysis(null);
-    const creditReportDataUri = await toBase64(file);
-    analyze({ creditReportDataUri });
+    setAnalyzing(true);
+    try {
+      const creditReportDataUri = await toBase64(file);
+      const result = await runFlow(analyzeCreditReport, { creditReportDataUri });
+      setAnalysis(result);
+      toast({
+        title: "Analysis Complete",
+        description: "Your credit report has been successfully analyzed.",
+      });
+    } catch (err) {
+      toast({
+        title: "Analysis Failed",
+        description: (err as Error).message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
