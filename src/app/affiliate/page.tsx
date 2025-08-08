@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Copy } from "lucide-react";
+import { Copy, PlusCircle } from "lucide-react";
+import Link from "next/link";
 
 const referrals = [
     {
@@ -56,21 +57,37 @@ export default function AffiliatePage() {
           </p>
         </div>
 
-        <Card>
-            <CardHeader>
-                <CardTitle>Your Referral Link</CardTitle>
-                <CardDescription>Share this link to refer new clients and earn commissions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="flex w-full max-w-lg items-center space-x-2">
-                    <Input type="text" readOnly value="https://creditclarity.ai/ref/YOUR_ID" />
-                    <Button type="submit">
-                        <Copy className="mr-2 h-4 w-4"/>
-                        Copy Link
+        <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Your Referral Link</CardTitle>
+                    <CardDescription>Share this link to refer new clients and earn commissions.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex w-full max-w-lg items-center space-x-2">
+                        <Input type="text" readOnly value="https://creditclarity.ai/ref/YOUR_ID" />
+                        <Button type="submit">
+                            <Copy className="mr-2 h-4 w-4"/>
+                            Copy Link
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Onboard a New Client</CardTitle>
+                    <CardDescription>Manually add a client to your dashboard and start their file.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild>
+                        <Link href="/affiliate/add-client">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Client
+                        </Link>
                     </Button>
-                </div>
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
         
         <div className="grid gap-4 md:grid-cols-3">
             <Card>
