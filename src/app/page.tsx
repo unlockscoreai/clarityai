@@ -13,8 +13,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { useFlow } from '@genkit-ai/next/client';
+import React, { useState, useMemo } from "react";
+import { useStreamFlow } from '@genkit-ai/next/client';
 import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +64,17 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
   const [email, setEmail] = useState('');
   const [reportFile, setReportFile] = useState<File | null>(null);
   
-  const [startAnalysis, {data: analysis, loading}] = useFlow(analyzeCreditReport);
+  const { stream, start, loading } = useStreamFlow(analyzeCreditReport);
+
+  const analysis = useMemo(() => {
+    let lastPiece: AnalyzeCreditReportOutput | undefined;
+    for (const piece of stream) {
+      if (piece.output) {
+        lastPiece = piece.output;
+      }
+    }
+    return lastPiece;
+  }, [stream]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -92,7 +102,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
     try {
       const creditReportDataUri = await fileToDataUri(reportFile);
       const input: AnalyzeCreditReportInput = { creditReportDataUri };
-      await startAnalysis(input);
+      start(input);
     } catch (error) {
       console.error("Analysis failed:", error);
       // Add user-facing error handling

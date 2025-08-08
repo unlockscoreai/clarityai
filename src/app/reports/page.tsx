@@ -16,15 +16,31 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFlow } from '@genkit-ai/next/client';
+import React, { useState, useMemo } from 'react';
+import { useStreamFlow } from '@genkit-ai/next/client';
 import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const [startAnalysis, { loading }] = useFlow(analyzeCreditReport);
+  const { stream, start, loading } = useStreamFlow(analyzeCreditReport);
+
+  const analysis = useMemo(() => {
+    let lastPiece: AnalyzeCreditReportOutput | undefined;
+    for (const piece of stream) {
+      if (piece.output) {
+        lastPiece = piece.output;
+      }
+    }
+    return lastPiece;
+  }, [stream]);
+
+  React.useEffect(() => {
+    if (analysis) {
+      onAnalysisComplete(analysis);
+    }
+  }, [analysis, onAnalysisComplete]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -49,10 +65,7 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
     try {
       const creditReportDataUri = await fileToDataUri(reportFile);
       const input: AnalyzeCreditReportInput = { creditReportDataUri };
-      const result = await startAnalysis(input);
-      if (result) {
-        onAnalysisComplete(result);
-      }
+      start(input);
     } catch (error) {
       console.error("Analysis failed:", error);
     }
