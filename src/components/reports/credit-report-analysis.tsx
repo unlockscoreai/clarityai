@@ -8,10 +8,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, UploadCloud, CheckCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, UploadCloud } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from "@/components/ui/separator";
+
+function AnalysisViewer({ html }: { html: string }) {
+  return (
+    <Card>
+       <CardHeader>
+        <CardTitle className="font-headline">Your In-Depth Credit Analysis</CardTitle>
+        <CardDescription>
+            This AI-powered analysis is based on the credit report you uploaded.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Rendered HTML is sanitized by the server-side prompt engineering */}
+        <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export function CreditReportAnalysis() {
   const [file, setFile] = useState<File | null>(null);
@@ -64,10 +80,10 @@ export function CreditReportAnalysis() {
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="space-y-8">
       <Card>
         <CardHeader>
-          <CardTitle className="font-headline">Analyze Your Credit Report</CardTitle>
+          <CardTitle className="font-headline">Analyze a New Credit Report</CardTitle>
           <CardDescription>
             Upload your credit report (PDF) to get an instant AI-powered analysis.
           </CardDescription>
@@ -97,60 +113,21 @@ export function CreditReportAnalysis() {
         </CardContent>
       </Card>
 
-      <Card className="min-h-[300px]">
-        <CardHeader>
-          <CardTitle className="font-headline">Analysis Results</CardTitle>
-          <CardDescription>
-            Errors, negative accounts, and improvement tips will appear here.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {analyzing && (
-            <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground h-full pt-10">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p>Our AI is analyzing your report...</p>
-            </div>
-          )}
-          {analysis && (
-            <div className="space-y-6">
-              <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle className="font-semibold">Analysis Summary</AlertTitle>
-                <AlertDescription>{analysis.analysisSummary}</AlertDescription>
-              </Alert>
+      {analyzing && (
+        <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-4 text-muted-foreground min-h-64">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-lg font-medium">Our AI is analyzing your report...</p>
+                <p className="text-sm">This may take a minute. Please don't close this page.</p>
+            </CardContent>
+        </Card>
+      )}
 
-              <Separator />
-
-              <div>
-                <h3 className="font-semibold mb-2">Errors Identified</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm">
-                  {analysis.errorsIdentified.map((error, i) => <li key={i}>{error}</li>)}
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-2 text-destructive">Negative Accounts</h3>
-                 <ul className="list-disc list-inside space-y-1 text-sm text-destructive">
-                  {analysis.negativeAccounts.map((account, i) => <li key={i}>{account}</li>)}
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-2 text-accent">Improvement Opportunities</h3>
-                <ul className="list-disc list-inside space-y-1 text-sm text-accent-foreground/90">
-                  {analysis.improvementOpportunities.map((opp, i) => <li key={i}>{opp}</li>)}
-                </ul>
-              </div>
-
-            </div>
-          )}
-          {!analyzing && !analysis && (
-             <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground h-full pt-10">
-              <p>Upload a report to see your analysis.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {analysis && <AnalysisViewer html={analysis.analysisHtml} />}
+      
     </div>
   );
 }
+
+
+    
