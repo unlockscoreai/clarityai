@@ -64,7 +64,7 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
   const [email, setEmail] = useState('');
   const [reportFile, setReportFile] = useState<File | null>(null);
   
-  const [startAnalysis, analysis, loading] = useFlow(analyzeCreditReport);
+  const [startAnalysis, {data: analysis, loading}] = useFlow(analyzeCreditReport);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -179,7 +179,6 @@ function FreeAnalysisForm({ setOpen }: { setOpen: (open: boolean) => void }) {
 
 
 export default function HomePage() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -260,4 +259,3 @@ export default function HomePage() {
     </div>
   );
 }
-
