@@ -99,7 +99,7 @@ export function SignupForm() {
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/" className="font-medium text-primary hover:underline">
+            <Link href="/login" className="font-medium text-primary hover:underline">
               Sign In
             </Link>
           </p>
