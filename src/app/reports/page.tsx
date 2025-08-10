@@ -16,31 +16,19 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import React, { useState, useMemo } from 'react';
-import { useStreamFlow } from '@genkit-ai/next/client';
-import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
+// Placeholder type for analysis output
+type AnalyzeCreditReportOutput = {
+    analysisHtml: string;
+};
+
+
 function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const { stream, start, loading } = useStreamFlow(analyzeCreditReport);
-
-  const analysis = useMemo(() => {
-    let lastPiece: AnalyzeCreditReportOutput | undefined;
-    for (const piece of stream) {
-      if (piece.output) {
-        lastPiece = piece.output;
-      }
-    }
-    return lastPiece;
-  }, [stream]);
-
-  React.useEffect(() => {
-    if (analysis) {
-      onAnalysisComplete(analysis);
-    }
-  }, [analysis, onAnalysisComplete]);
+  const [loading, setLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -48,27 +36,18 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
     }
   };
 
-  const fileToDataUri = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
 
   const handleUpload = async () => {
     if (!reportFile) {
       console.error("No report file selected");
       return;
     }
-    try {
-      const creditReportDataUri = await fileToDataUri(reportFile);
-      const input: AnalyzeCreditReportInput = { creditReportDataUri };
-      start(input);
-    } catch (error) {
-      console.error("Analysis failed:", error);
-    }
+    setLoading(true);
+    // Mock analysis
+    setTimeout(() => {
+        onAnalysisComplete({ analysisHtml: "<h3>Your analysis will appear here.</h3><p>This is a placeholder for the AI-generated credit report analysis. The real feature is currently disabled due to a technical issue.</p>" });
+        setLoading(false);
+    }, 1500);
   };
 
   return (
