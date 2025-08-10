@@ -19,16 +19,23 @@ import Link from 'next/link';
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { runFlow } from '@genkit-ai/next/client';
+import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import { useToast } from '@/hooks/use-toast';
 
-// Placeholder type for analysis output
-type AnalyzeCreditReportOutput = {
-    analysisHtml: string;
-};
-
+function fileToDataURI(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -36,18 +43,35 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
     }
   };
 
-
   const handleUpload = async () => {
     if (!reportFile) {
-      console.error("No report file selected");
+      toast({
+        variant: "destructive",
+        title: "No file selected",
+        description: "Please select a credit report PDF to analyze.",
+      });
       return;
     }
     setLoading(true);
-    // Mock analysis
-    setTimeout(() => {
-        onAnalysisComplete({ analysisHtml: "<h3>Your analysis will appear here.</h3><p>This is a placeholder for the AI-generated credit report analysis. The real feature is currently disabled due to a technical issue.</p>" });
+
+    try {
+      const creditReportDataUri = await fileToDataURI(reportFile);
+      const input: AnalyzeCreditReportInput = { creditReportDataUri };
+      
+      const analysisResult = await runFlow(analyzeCreditReport, input);
+
+      onAnalysisComplete(analysisResult);
+
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Something went wrong while analyzing your report. Please try again.",
+      });
+    } finally {
         setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -75,7 +99,6 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
 
 function AnalysisDisplay({ analysis }: { analysis: AnalyzeCreditReportOutput | null }) {
   if (!analysis) {
-    // This could be a welcome message or an empty state.
     return (
        <Card>
             <CardHeader>
