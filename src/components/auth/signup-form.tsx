@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,95 +9,202 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Chrome } from "lucide-react";
+import {
+  Loader2,
+  UploadCloud,
+  FileCheck,
+  Lock,
+} from "lucide-react";
 import Link from "next/link";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
+import { runFlow } from '@genkit-ai/next/client';
+import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import { useToast } from "@/hooks/use-toast";
 
-function AppleIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z" />
-      <path d="M10 2c1 .5 2 2 2 5" />
-    </svg>
-  );
+type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
+
+function fileToDataURI(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
+
+function AnalysisPreview({ htmlContent }: { htmlContent: string }) {
+    const previewContent = useMemo(() => {
+        // Creates a temporary div to parse the HTML string
+        const doc = new DOMParser().parseFromString(htmlContent, 'text/html');
+        // We'll take the first 3 sections as a preview
+        const sections = Array.from(doc.querySelectorAll('body > *')).slice(0, 3);
+        return sections.map(el => el.outerHTML).join('');
+    }, [htmlContent]);
+
+    return <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: previewContent }} />;
+}
+
 
 export function SignupForm() {
   const router = useRouter();
-  
+  const { toast } = useToast();
+
+  const [step, setStep] = useState<SignupStep>("upload");
+  const [reportFile, setReportFile] = useState<File | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setReportFile(e.target.files[0]);
+    }
+  };
+
+  const handleAnalyze = async () => {
+    if (!reportFile) {
+      toast({
+        variant: "destructive",
+        title: "No file selected",
+        description: "Please select a credit report PDF to analyze.",
+      });
+      return;
+    }
+    setStep("analyzing");
+
+    try {
+      const creditReportDataUri = await fileToDataURI(reportFile);
+      const input: AnalyzeCreditReportInput = { creditReportDataUri };
+      
+      const analysisResult = await runFlow(analyzeCreditReport, input);
+      
+      setAnalysis(analysisResult);
+      setStep("preview");
+
+    } catch (error) {
+      console.error("Analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Something went wrong while analyzing your report. Please try again.",
+      });
+      setStep("upload");
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // In a real app, this would handle account creation
+    toast({
+        title: "Account Created!",
+        description: "Welcome to Credit Clarity AI. Your full report is now available.",
+    });
     router.push('/dashboard');
-  }
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case "upload":
+        return (
+          <>
+            <CardHeader className="text-center">
+                <CardTitle className="text-3xl font-headline font-bold text-primary">Get Your Free Analysis</CardTitle>
+                <CardDescription className="font-body">
+                    Upload your credit report to get started. We'll give you a personalized analysis in minutes.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Label htmlFor="report-upload" className="w-full cursor-pointer rounded-lg border-2 border-dashed border-muted-foreground/50 p-8 hover:bg-muted">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        {reportFile ? <FileCheck className="h-12 w-12 text-green-500" /> : <UploadCloud className="h-12 w-12" />}
+                        <span>{reportFile ? reportFile.name : 'Click or drag to upload a PDF'}</span>
+                    </div>
+                </Label>
+                <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
+                <Button onClick={handleAnalyze} disabled={!reportFile} className="w-full font-bold">
+                    Analyze My Report
+                </Button>
+            </CardContent>
+          </>
+        );
+      case "analyzing":
+        return (
+            <CardContent className="flex flex-col items-center justify-center space-y-4 p-12">
+                <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                <h2 className="text-2xl font-headline font-semibold">Analyzing Your Report...</h2>
+                <p className="text-muted-foreground text-center">
+                    Our AI is securely scanning your file to find opportunities. This may take a moment.
+                </p>
+            </CardContent>
+        );
+      case "preview":
+        return (
+            <>
+                <CardHeader>
+                    <CardTitle className="text-3xl font-headline font-bold text-primary">Your Analysis is Ready!</CardTitle>
+                    <CardDescription className="font-body">
+                        Here's a preview. Create an account to unlock your full report and credit boosters.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {analysis && <AnalysisPreview htmlContent={analysis.analysisHtml} />}
+                    <div className="relative mt-4">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-card px-2 text-muted-foreground">Unlock Full Report</span>
+                        </div>
+                    </div>
+                     <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-lg border bg-slate-50/50 p-4 text-center dark:bg-slate-800/20">
+                        <Lock className="h-8 w-8 text-primary" />
+                        <p className="font-semibold">Create your account to continue.</p>
+                        <Button onClick={() => setStep('create_account')} className="w-full font-bold">
+                            Create Account & View Full Report
+                        </Button>
+                    </div>
+                </CardContent>
+            </>
+        );
+      case "create_account":
+        return (
+            <>
+                <CardHeader>
+                    <CardTitle className="text-3xl font-headline font-bold text-primary">Almost there!</CardTitle>
+                    <CardDescription className="font-body">
+                        Create your account to save your analysis and start improving your credit.
+                    </CardDescription>
+                </CardHeader>
+                <form onSubmit={handleSubmit}>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="fullName">Full Name</Label>
+                            <Input id="fullName" placeholder="John Doe" required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input id="email" type="email" placeholder="name@example.com" required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input id="password" type="password" required />
+                        </div>
+                        <Button type="submit" className="w-full font-bold">
+                            Create Account
+                        </Button>
+                    </CardContent>
+                </form>
+            </>
+        )
+    }
+  };
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border-0">
-      <CardHeader className="text-center">
-        <h1 className="text-3xl font-headline font-bold text-primary">
-          Get Started
-        </h1>
-        <CardDescription className="font-body">
-          Create an account to start improving your credit.
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input id="fullName" placeholder="John Doe" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="name@example.com" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required />
-          </div>
-          <div className="space-y-2">
-              <Label>I am a...</Label>
-              <Select required>
-                  <SelectTrigger>
-                      <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="client">Client</SelectItem>
-                      <SelectItem value="affiliate">Affiliate</SelectItem>
-                  </SelectContent>
-              </Select>
-          </div>
-          <Button type="submit" className="w-full font-bold">
-            Create Account
-          </Button>
-          <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">Or sign up with</span>
-              </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline"><Chrome className="mr-2 h-4 w-4"/>Google</Button>
-              <Button variant="outline"><AppleIcon className="mr-2 h-4 w-4"/>Apple</Button>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-center">
+    <Card className="w-full max-w-lg shadow-2xl border-0">
+      {renderStep()}
+      <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/login" className="font-medium text-primary hover:underline">
@@ -104,7 +212,6 @@ export function SignupForm() {
             </Link>
           </p>
         </CardFooter>
-      </form>
     </Card>
   );
 }
