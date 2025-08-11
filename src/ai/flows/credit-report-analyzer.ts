@@ -16,6 +16,8 @@ import { subMonths, differenceInYears, differenceInMonths } from 'date-fns';
 
 // #region Input and Output Schemas
 const AnalyzeCreditReportInputSchema = z.object({
+  fullName: z.string().describe('The full name of the user.'),
+  email: z.string().email().describe('The email address of the user.'),
   creditReportDataUri: z
     .string()
     .describe(
@@ -83,7 +85,7 @@ const DerivedTotalsSchema = z.object({
     mostRecentLateMonths: z.number().optional(),
 });
 
-const AnalysisPromptInputSchema = ParsedReportSchema.merge(DerivedTotalsSchema);
+const AnalysisPromptInputSchema = ParsedReportSchema.merge(DerivedTotalsSchema).merge(AnalyzeCreditReportInputSchema);
 
 const AnalyzeCreditReportOutputSchema = z.object({
   analysisHtml: z.string().describe('The full HTML analysis of the credit report.'),
@@ -103,6 +105,8 @@ const parseReportPrompt = ai.definePrompt({
   output: {schema: ParsedReportSchema},
   prompt: `You are an expert credit analyst. Analyze the following credit report and extract the user's personal information, credit scores, account details, public records, inquiries, and collection accounts into the specified JSON format.
 
+The user's name is {{fullName}} and their email is {{email}}. Use this to help resolve any ambiguities in the provided report.
+
 Credit Report:
 {{media url=creditReportDataUri}}
 
@@ -114,7 +118,7 @@ const generateAnalysisPrompt = ai.definePrompt({
     name: 'generateAnalysisPrompt',
     input: { schema: AnalysisPromptInputSchema },
     output: { schema: AnalyzeCreditReportOutputSchema },
-    system: `You are a highly professional, empathetic credit analyst assistant. Produce a clear, persuasive, data-driven personal credit analysis based on the parsed credit report data. Output valid HTML (no external CSS) with semantic sections that can be rendered directly in a dashboard or converted to PDF.`,
+    system: `You are a highly professional, empathetic credit analyst assistant. Produce a clear, persuasive, data-driven personal credit analysis based on the parsed credit report data. The user's name is {{fullName}}. Output valid HTML (no external CSS) with semantic sections that can be rendered directly in a dashboard or converted to PDF.`,
     prompt: `
 INSTRUCTIONS:
 - Read the provided JSON data.
@@ -247,6 +251,7 @@ const analyzeCreditReportFlow = ai.defineFlow(
     const analysisInput = {
         ...parsedReport,
         ...derivedTotals,
+        ...input,
     };
     
     const { output: analysisResult } = await generateAnalysisPrompt({ anaylsisInput: analysisInput });
@@ -257,5 +262,3 @@ const analyzeCreditReportFlow = ai.defineFlow(
     return analysisResult;
   }
 );
-
-    

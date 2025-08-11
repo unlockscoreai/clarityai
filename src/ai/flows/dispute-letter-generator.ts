@@ -1,4 +1,4 @@
-// src/ai/flows/dispute-letter-generator.ts
+
 'use server';
 
 /**
@@ -13,14 +13,20 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateDisputeLetterInputSchema = z.object({
-  reportId: z.string().describe('The ID of the credit report to use.'),
+  fullName: z.string().describe('The full name of the person on the report.'),
+  dob: z.string().describe('Date of birth in YYYY-MM-DD format.'),
+  address: z.string().describe('Current address.'),
   creditBureau: z.enum(['Equifax', 'Experian', 'TransUnion']).describe('The credit bureau to send the letter to.'),
-  disputeReasons: z.string().describe('The reasons for the dispute.'),
+  disputedItem: z.object({
+      accountNumber: z.string().describe('The account number of the disputed item.'),
+      creditor: z.string().describe('The name of the creditor for the disputed item.'),
+  }),
+  disputeReasons: z.array(z.string()).describe('A list of reasons for the dispute.'),
 });
 export type GenerateDisputeLetterInput = z.infer<typeof GenerateDisputeLetterInputSchema>;
 
 const GenerateDisputeLetterOutputSchema = z.object({
-  letterContent: z.string().describe('The generated dispute letter content.'),
+  letterContent: z.string().describe('The generated dispute letter content in Markdown format.'),
 });
 export type GenerateDisputeLetterOutput = z.infer<typeof GenerateDisputeLetterOutputSchema>;
 
@@ -32,16 +38,33 @@ const disputeLetterPrompt = ai.definePrompt({
   name: 'disputeLetterPrompt',
   input: {schema: GenerateDisputeLetterInputSchema},
   output: {schema: GenerateDisputeLetterOutputSchema},
-  prompt: `You are an expert in generating credit dispute letters.
+  prompt: `
+  You are an expert in writing legally compliant and effective credit dispute letters under the Fair Credit Reporting Act (FCRA).
 
-  Based on the credit report with ID: {{{reportId}}}, and the following dispute reasons: {{{disputeReasons}}},
-  generate a personalized dispute letter to the credit bureau: {{{creditBureau}}}.
+  Generate a professional and formal dispute letter based on the provided JSON data. The letter should be addressed to the specified credit bureau.
 
-  The letter should clearly state the inaccuracies and request an investigation and correction.
+  **Instructions:**
+  1.  **Use today's date.**
+  2.  **Include all personal identification information** provided in the input JSON: Full Name, Date of Birth, and Address.
+  3.  **Address the letter to the correct credit bureau** with its full name and address.
+      *   **Equifax:** Equifax Information Services LLC, P.O. Box 740256, Atlanta, GA 30374
+      *   **Experian:** Experian, P.O. Box 4500, Allen, TX 75013
+      *   **TransUnion:** TransUnion LLC Consumer Dispute Center, P.O. Box 2000, Chester, PA 19016
+  4.  **Reference the disputed account** clearly by name (creditor) and account number.
+  5.  **State the reason for the dispute.** Clearly explain that the item is inaccurate and being challenged. Incorporate the specific dispute reasons from the input.
+  6.  **Formally request an investigation and deletion.** Cite the FCRA requirement for the bureau to investigate and remove unverified or inaccurate information within 30 days.
+  7.  **Include a closing statement** requesting a copy of the investigation results and an updated copy of the credit report.
+  8.  **The closing should be "Sincerely," followed by the user's full name.**
+  9.  **Add an "Enclosures" section** at the bottom, listing "Copy of Driver's License" and "Copy of Utility Bill" as proof of identity and address.
 
-  Ensure the letter is professional and complies with legal requirements for credit disputes.
+  **Do not invent any information.** Use only the data provided in the input.
 
-  Output the full letter content.
+  **Input Data:**
+  \`\`\`json
+  {{{json input}}}
+  \`\`\`
+
+  Output the complete letter content in plain text/Markdown format.
   `,
 });
 
@@ -52,7 +75,7 @@ const generateDisputeLetterFlow = ai.defineFlow(
     outputSchema: GenerateDisputeLetterOutputSchema,
   },
   async input => {
-    const {output} = await disputeLetterPrompt(input);
+    const {output} = await disputeLetterPrompt({ input });
     return output!;
   }
 );

@@ -56,6 +56,11 @@ export function SignupForm() {
   const [step, setStep] = useState<SignupStep>("upload");
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+  
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -63,12 +68,14 @@ export function SignupForm() {
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!reportFile) {
+  const handleAnalyze = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!reportFile || !fullName || !email) {
       toast({
         variant: "destructive",
-        title: "No file selected",
-        description: "Please select a credit report PDF to analyze.",
+        title: "Missing Information",
+        description: "Please fill out all fields and select a file to analyze.",
       });
       return;
     }
@@ -76,7 +83,11 @@ export function SignupForm() {
 
     try {
       const creditReportDataUri = await fileToDataURI(reportFile);
-      const input: AnalyzeCreditReportInput = { creditReportDataUri };
+      const input: AnalyzeCreditReportInput = { 
+          creditReportDataUri,
+          fullName,
+          email
+      };
       
       const analysisResult = await runFlow(analyzeCreditReport, input);
       
@@ -94,7 +105,7 @@ export function SignupForm() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateAccount = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // In a real app, this would handle account creation
     toast({
@@ -115,18 +126,29 @@ export function SignupForm() {
                     Upload your credit report to get started. We'll give you a personalized analysis in minutes.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <Label htmlFor="report-upload" className="w-full cursor-pointer rounded-lg border-2 border-dashed border-muted-foreground/50 p-8 hover:bg-muted">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        {reportFile ? <FileCheck className="h-12 w-12 text-green-500" /> : <UploadCloud className="h-12 w-12" />}
-                        <span>{reportFile ? reportFile.name : 'Click or drag to upload a PDF'}</span>
+            <form onSubmit={handleAnalyze}>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="fullName">Full Name</Label>
+                        <Input id="fullName" placeholder="John Doe" required value={fullName} onChange={e => setFullName(e.target.value)} />
                     </div>
-                </Label>
-                <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
-                <Button onClick={handleAnalyze} disabled={!reportFile} className="w-full font-bold">
-                    Analyze My Report
-                </Button>
-            </CardContent>
+                     <div className="space-y-2">
+                        <Label htmlFor="email">Email Address</Label>
+                        <Input id="email" type="email" placeholder="john@example.com" required value={email} onChange={e => setEmail(e.target.value)} />
+                    </div>
+
+                    <Label htmlFor="report-upload" className="w-full cursor-pointer rounded-lg border-2 border-dashed border-muted-foreground/50 p-8 hover:bg-muted">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            {reportFile ? <FileCheck className="h-12 w-12 text-green-500" /> : <UploadCloud className="h-12 w-12" />}
+                            <span>{reportFile ? reportFile.name : 'Click or drag to upload a PDF'}</span>
+                        </div>
+                    </Label>
+                    <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
+                    <Button type="submit" disabled={!reportFile || !fullName || !email} className="w-full font-bold">
+                        Analyze My Report
+                    </Button>
+                </CardContent>
+            </form>
           </>
         );
       case "analyzing":
@@ -177,19 +199,19 @@ export function SignupForm() {
                         Create your account to save your analysis and start improving your credit.
                     </CardDescription>
                 </CardHeader>
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleCreateAccount}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="fullName">Full Name</Label>
-                            <Input id="fullName" placeholder="John Doe" required />
+                            <Input id="fullName" value={fullName} required readOnly disabled />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" placeholder="name@example.com" required />
+                            <Input id="email" type="email" value={email} required readOnly disabled />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
-                            <Input id="password" type="password" required />
+                            <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
                         </div>
                         <Button type="submit" className="w-full font-bold">
                             Create Account
