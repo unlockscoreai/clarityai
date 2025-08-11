@@ -22,7 +22,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runFlow } from '@genkit-ai/next/client';
-import { analyzeCreditReport, AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import type { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
 
 type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
@@ -89,7 +89,7 @@ export function SignupForm() {
           email
       };
       
-      const analysisResult = await runFlow(analyzeCreditReport, input);
+      const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReport', input);
       
       setAnalysis(analysisResult);
       setStep("preview");
