@@ -16,6 +16,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "@/lib/firebase/client";
 
 function AppleIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -42,26 +44,23 @@ export function LoginForm() {
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setLoading(true);
     
-    if (email === "support@unlockscoreai.com" && password === "GMTAcademy23$") {
-      // Admin login
-      toast({
-        title: "Admin Login Successful",
-        description: "Welcome, admin!",
-      });
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
-    } else if (email && password) {
-      // Regular user login
-      router.push('/dashboard');
-    } else {
+    } catch (error: any) {
         toast({
             variant: "destructive",
             title: "Login Failed",
-            description: "Please check your email and password.",
+            description: error.message || "Please check your email and password.",
         });
+    } finally {
+        setLoading(false);
     }
   }
 
@@ -90,8 +89,8 @@ export function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <Button type="submit" className="w-full font-bold">
-            Sign In
+          <Button type="submit" className="w-full font-bold" disabled={loading}>
+            {loading ? 'Signing In...' : 'Sign In'}
           </Button>
           <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">

@@ -22,8 +22,12 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { runFlow } from '@genkit-ai/next/client';
-import type { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore"; 
+import { auth, db } from "@/lib/firebase/client";
+import { AnalyzeCreditReportInput } from "@/ai/flows/credit-report-analyzer";
 
 type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
 
@@ -105,14 +109,42 @@ export function SignupForm() {
     }
   };
 
-  const handleCreateAccount = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // In a real app, this would handle account creation
-    toast({
-        title: "Account Created!",
-        description: "Welcome to Credit Clarity AI. Your full report is now available.",
-    });
-    router.push('/dashboard');
+    if (!password) {
+        toast({ variant: "destructive", title: "Password is required."});
+        return;
+    }
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        // Store user info in Firestore
+        await setDoc(doc(db, "users", user.uid), {
+            fullName: fullName,
+            email: user.email,
+        });
+
+        // Store report in Firestore
+        if (analysis) {
+            await setDoc(doc(db, "reports", user.uid), {
+                ...analysis,
+                createdAt: new Date(),
+            });
+        }
+
+        toast({
+            title: "Account Created!",
+            description: "Welcome to Credit Clarity AI. Your full report is now available.",
+        });
+        router.push('/dashboard');
+    } catch (error: any) {
+         toast({
+            variant: "destructive",
+            title: "Account Creation Failed",
+            description: error.message || "An unexpected error occurred.",
+        });
+    }
   };
 
   const renderStep = () => {

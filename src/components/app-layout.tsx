@@ -8,6 +8,7 @@ import {
   GanttChartSquare,
   Handshake,
   Home,
+  Loader2,
   PanelLeft,
   Settings,
   User,
@@ -31,6 +32,8 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import * as React from "react";
+import { useSession } from "@/context/session-provider";
+import { auth } from "@/lib/firebase/client";
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
@@ -62,6 +65,26 @@ function LogoIcon(props: React.SVGProps<SVGSVGElement>) {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, loading } = useSession();
+
+  React.useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
@@ -175,7 +198,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem onClick={() => router.push('/settings')}>Settings</DropdownMenuItem>
                 <DropdownMenuItem>Support</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/')}>Logout</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
