@@ -89,7 +89,7 @@ export function SignupForm() {
           email
       };
       
-      const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReport', input);
+      const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReportFlow', input);
       
       setAnalysis(analysisResult);
       setStep("preview");
