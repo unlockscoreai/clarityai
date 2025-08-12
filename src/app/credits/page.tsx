@@ -1,7 +1,14 @@
+
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useSession } from "@/context/session-provider";
+import { useToast } from "@/hooks/use-toast";
+import { getStripe } from "@/lib/stripe-client";
 
 const subscriptionPlans = [
     {
@@ -38,6 +45,57 @@ const creditPacks = [
 
 
 export default function CreditsPage() {
+  const [loading, setLoading] = useState<string | null>(null);
+  const { user } = useSession();
+  const { toast } = useToast();
+
+  const handleCheckout = async (item: {name: string, price: string} | {credits: number, price: number}) => {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Not Authenticated",
+            description: "You must be logged in to make a purchase."
+        });
+        return;
+    }
+
+    const { name, credits, price } = 'name' in item ? {name: item.name, credits: item.credits, price: item.price} : {name: null, credits: item.credits, price: `$${item.price}`};
+    setLoading(name || `credits-${credits}`);
+
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify('name' in item ? { plan: item } : { credits: item }),
+        });
+
+        const { sessionId } = await res.json();
+        if (!sessionId) {
+            throw new Error("Could not create checkout session");
+        }
+        
+        const stripe = await getStripe();
+        const { error } = await stripe!.redirectToCheckout({ sessionId });
+
+        if (error) {
+            throw error;
+        }
+
+    } catch (err: any) {
+         toast({
+            variant: "destructive",
+            title: "Payment Error",
+            description: err.message || "Something went wrong. Please try again."
+        });
+    } finally {
+        setLoading(null);
+    }
+  }
+
   return (
     <AppLayout>
       <div className="space-y-12">
@@ -67,8 +125,12 @@ export default function CreditsPage() {
                             ))}
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full font-bold" disabled={plan.isCurrent}>
-                                {plan.isCurrent ? "Current Plan" : "Upgrade Plan"}
+                            <Button 
+                                className="w-full font-bold" 
+                                disabled={plan.isCurrent || loading !== null} 
+                                onClick={() => handleCheckout(plan)}
+                            >
+                                {loading === plan.name ? <Loader2 className="animate-spin" /> : plan.isCurrent ? "Current Plan" : "Upgrade Plan"}
                             </Button>
                         </CardFooter>
                     </Card>
@@ -88,7 +150,14 @@ export default function CreditsPage() {
                             <p className="text-3xl font-bold">${pack.price}</p>
                         </CardContent>
                         <CardFooter>
-                            <Button variant="outline" className="w-full">Buy Now</Button>
+                            <Button 
+                                variant="outline" 
+                                className="w-full" 
+                                disabled={loading !== null} 
+                                onClick={() => handleCheckout(pack)}
+                            >
+                                {loading === `credits-${pack.credits}` ? <Loader2 className="animate-spin" /> : 'Buy Now'}
+                            </Button>
                         </CardFooter>
                     </Card>
                 ))}
