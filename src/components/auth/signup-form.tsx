@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import { runFlow } from '@genkit-ai/next/client';
 import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore"; 
 import { auth, db } from "@/lib/firebase/client";
 import { AnalyzeCreditReportInput } from "@/ai/flows/credit-report-analyzer";
@@ -119,10 +119,16 @@ export function SignupForm() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
+        // Update Firebase Auth profile
+        await updateProfile(user, { displayName: fullName });
+
         // Store user info in Firestore
         await setDoc(doc(db, "users", user.uid), {
             fullName: fullName,
             email: user.email,
+            upgraded: false, // Set default upgrade status
+            plan: null,
+            upgradeDate: null,
         });
 
         // Store report in Firestore

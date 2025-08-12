@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,12 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lock, ArrowRight } from "lucide-react";
+import { Lock, ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/context/session-provider";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+import { useRouter } from "next/navigation";
 
 const recommendedDisputes = [
     { item: 'Collection — ABC Collections', type: 'Collection', why: 'No original creditor name; balance mismatch', successChance: '72%' },
@@ -31,7 +35,35 @@ const recommendedDisputes = [
 ];
 
 export default function DisputesPage() {
-  const [isUpgraded, setIsUpgraded] = useState(false); // Mock user status
+  const { user } = useSession();
+  const router = useRouter();
+  const [isUpgraded, setIsUpgraded] = useState<boolean | null>(null); // null for loading state
+  
+  useEffect(() => {
+    if (user) {
+      const checkUpgradeStatus = async () => {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setIsUpgraded(userDoc.data().upgraded || false);
+        } else {
+          setIsUpgraded(false);
+        }
+      };
+      checkUpgradeStatus();
+    }
+  }, [user]);
+
+
+  if (isUpgraded === null) {
+    return (
+        <AppLayout>
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        </AppLayout>
+    )
+  }
 
   return (
     <AppLayout>
@@ -56,7 +88,7 @@ export default function DisputesPage() {
                 <span>
                     Upgrade your plan to generate and mail your personalized letters.
                 </span>
-                 <Button onClick={() => setIsUpgraded(true)}>
+                 <Button onClick={() => router.push('/credits')}>
                     Upgrade to Pro <ArrowRight className="ml-2 h-4 w-4" />
                  </Button>
             </AlertDescription>
