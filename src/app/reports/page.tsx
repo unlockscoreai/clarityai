@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { runFlow } from '@genkit-ai/next/client';
 import { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from '@/hooks/use-toast';
+import { useSession } from '@/context/session-provider';
 
 function fileToDataURI(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -36,6 +37,7 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useSession();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -52,16 +54,23 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
       });
       return;
     }
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Not authenticated",
+            description: "You must be logged in to upload a report.",
+        });
+        return;
+    }
     setLoading(true);
 
     try {
       const creditReportDataUri = await fileToDataURI(reportFile);
-      // Note: We don't have user's full name and email here like in the signup form.
-      // The flow is designed to handle this, but for a real app you might want to fetch user data.
+      
       const input: AnalyzeCreditReportInput = { 
         creditReportDataUri,
-        fullName: 'Current User',
-        email: 'user@example.com'
+        fullName: user.displayName || 'Current User',
+        email: user.email || 'user@example.com'
       };
       
       const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReportFlow', input);
