@@ -49,7 +49,7 @@ export default function CreditsPage() {
   const { user } = useSession();
   const { toast } = useToast();
 
-  const handleCheckout = async (item: {name: string, price: string} | {credits: number, price: number}) => {
+  const handleCheckout = async (item: {name: string, price: string, credits: string} | {credits: number, price: number}) => {
     if (!user) {
         toast({
             variant: "destructive",
@@ -70,19 +70,22 @@ export default function CreditsPage() {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify('name' in item ? { plan: item } : { credits: item }),
+            body: JSON.stringify('name' in item ? { plan: item, user } : { credits: item, user }),
         });
 
-        const { sessionId } = await res.json();
+        const { sessionId, error } = await res.json();
+        if (error) {
+            throw new Error(error);
+        }
         if (!sessionId) {
             throw new Error("Could not create checkout session");
         }
         
         const stripe = await getStripe();
-        const { error } = await stripe!.redirectToCheckout({ sessionId });
+        const { error: stripeError } = await stripe!.redirectToCheckout({ sessionId });
 
-        if (error) {
-            throw error;
+        if (stripeError) {
+            throw stripeError;
         }
 
     } catch (err: any) {

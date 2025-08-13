@@ -19,15 +19,24 @@ export async function POST(req: NextRequest) {
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
       const firebaseUID = session.metadata?.firebaseUID;
+      const stripeCustomerId = session.metadata?.stripeCustomerId;
 
       if (firebaseUID) {
         const userDocRef = doc(db, "users", firebaseUID);
-        await updateDoc(userDocRef, {
+        
+        const updateData: { [key: string]: any } = {
             upgraded: true,
             plan: 'Pro', // This can be made dynamic based on the purchased item
             upgradeDate: serverTimestamp()
-        });
-         console.log(`Successfully upgraded user: ${firebaseUID}`);
+        };
+
+        if (stripeCustomerId) {
+            updateData.stripeCustomerId = stripeCustomerId;
+        }
+
+        await updateDoc(userDocRef, updateData);
+
+        console.log(`Successfully upgraded user: ${firebaseUID}`);
       }
     }
 

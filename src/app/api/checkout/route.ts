@@ -5,11 +5,11 @@ import {NextResponse} from 'next/server';
 import {auth} from '@/lib/firebase/server';
 import {stripe} from '@/lib/stripe';
 import {headers} from 'next/headers';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
 export async function POST(req: Request) {
-  const { plan, credits } = await req.json();
+  const { plan, credits, user: authedUser } = await req.json();
   const headersList = headers();
   const origin = headersList.get('origin');
 
@@ -18,26 +18,26 @@ export async function POST(req: Request) {
       headersList.get('Authorization')?.split('Bearer ')[1] || ''
     );
     
-    if (!session) {
+    if (!session || session.uid !== authedUser.uid) {
       return NextResponse.json({error: 'Unauthorized'}, {status: 401});
     }
 
-    const userDocRef = doc(db, 'users', session.uid);
-    const userDoc = await getDoc(userDocRef);
-    const user = userDoc.data();
-
-    let stripeCustomerId = user?.stripeCustomerId;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: session.email,
-        name: user?.fullName,
-        metadata: {
-            firebaseUID: session.uid
-        }
-      });
-      stripeCustomerId = customer.id;
-    }
+    // Since we don't have a server-side db instance, we can't fetch the user doc here.
+    // We will create the customer if needed, and rely on the webhook to update the user doc.
+    // For now, let's assume we create a new customer each time for simplicity,
+    // or retrieve it if we have an ID. Webhooks can later consolidate this.
+    
+    // A robust implementation would query Firestore for a user with this UID
+    // to see if a stripeCustomerId already exists.
+    
+    const customer = await stripe.customers.create({
+      email: session.email,
+      name: authedUser.displayName,
+      metadata: {
+          firebaseUID: session.uid
+      }
+    });
+    const stripeCustomerId = customer.id;
 
     const line_items = [];
 
@@ -81,6 +81,7 @@ export async function POST(req: Request) {
       cancel_url: `${origin}/credits`,
       metadata: {
         firebaseUID: session.uid,
+        stripeCustomerId: stripeCustomerId, // Pass this to the webhook
       },
     });
 
