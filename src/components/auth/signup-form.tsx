@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { runFlow } from '@genkit-ai/next/client';
 import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -65,6 +64,22 @@ export function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      console.error("Analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Something went wrong while analyzing your report. Please try again.",
+      });
+      setStep("upload");
+      setLoading(false);
+    }
+  }, [error, toast]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -84,6 +99,8 @@ export function SignupForm() {
       return;
     }
     setStep("analyzing");
+    setLoading(true);
+    setError(null);
 
     try {
       const creditReportDataUri = await fileToDataURI(reportFile);
@@ -93,19 +110,24 @@ export function SignupForm() {
           email
       };
       
-      const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReportFlow', input);
-      
+      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
+      }
+
+      const analysisResult: AnalyzeCreditReportOutput = await response.json();
       setAnalysis(analysisResult);
       setStep("preview");
 
-    } catch (error) {
-      console.error("Analysis failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: "Something went wrong while analyzing your report. Please try again.",
-      });
-      setStep("upload");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -115,6 +137,7 @@ export function SignupForm() {
         toast({ variant: "destructive", title: "Password is required."});
         return;
     }
+    setLoading(true);
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
@@ -126,7 +149,7 @@ export function SignupForm() {
         await setDoc(doc(db, "users", user.uid), {
             fullName: fullName,
             email: user.email,
-            upgraded: false, // Set default upgrade status
+            upgraded: false,
             plan: null,
             upgradeDate: null,
         });
@@ -150,6 +173,8 @@ export function SignupForm() {
             title: "Account Creation Failed",
             description: error.message || "An unexpected error occurred.",
         });
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -182,8 +207,8 @@ export function SignupForm() {
                         </div>
                     </Label>
                     <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
-                    <Button type="submit" disabled={!reportFile || !fullName || !email} className="w-full font-bold">
-                        Analyze My Report
+                    <Button type="submit" disabled={!reportFile || !fullName || !email || loading} className="w-full font-bold">
+                        {loading ? <Loader2 className="animate-spin" /> : "Analyze My Report"}
                     </Button>
                 </CardContent>
             </form>
@@ -251,8 +276,8 @@ export function SignupForm() {
                             <Label htmlFor="password">Password</Label>
                             <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
                         </div>
-                        <Button type="submit" className="w-full font-bold">
-                            Create Account
+                        <Button type="submit" className="w-full font-bold" disabled={loading}>
+                            {loading ? <Loader2 className="animate-spin" /> : "Create Account" }
                         </Button>
                     </CardContent>
                 </form>

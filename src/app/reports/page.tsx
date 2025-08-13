@@ -16,10 +16,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { runFlow } from '@genkit-ai/next/client';
 import { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
@@ -35,9 +34,22 @@ function fileToDataURI(file: File): Promise<string> {
 
 function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useSession();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (error) {
+      console.error("Analysis failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Something went wrong while analyzing your report. Please try again.",
+      });
+    }
+  }, [error, toast]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -62,7 +74,9 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
         });
         return;
     }
+
     setLoading(true);
+    setError(null);
 
     try {
       const creditReportDataUri = await fileToDataURI(reportFile);
@@ -73,19 +87,23 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
         email: user.email || 'user@example.com'
       };
       
-      const analysisResult = await runFlow<AnalyzeCreditReportOutput>('analyzeCreditReportFlow', input);
+      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
 
+      if (!response.ok) {
+        throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
+      }
+      
+      const analysisResult = await response.json();
       onAnalysisComplete(analysisResult);
 
-    } catch (error) {
-      console.error("Analysis failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: "Something went wrong while analyzing your report. Please try again.",
-      });
+    } catch (error: any) {
+      setError(error.message);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
