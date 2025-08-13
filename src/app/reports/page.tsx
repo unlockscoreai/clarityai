@@ -1,27 +1,14 @@
 
 'use client';
 
-import { AppLayout } from '@/components/app-layout';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  FileText,
-  Loader2,
-  UploadCloud,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSession } from '@/context/session-provider';
 
 function fileToDataURI(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -32,61 +19,33 @@ function fileToDataURI(file: File): Promise<string> {
   });
 }
 
-function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (analysis: AnalyzeCreditReportOutput) => void }) {
-  const [reportFile, setReportFile] = useState<File | null>(null);
-  const { toast } = useToast();
-  const { user } = useSession();
+export default function ReportsPage() {
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    if (error) {
-      console.error("Analysis failed:", error);
+  const handleAnalyze = async () => {
+    if (!file) {
       toast({
-        variant: "destructive",
-        title: "Analysis Failed",
-        description: "Something went wrong while analyzing your report. Please try again.",
-      });
-    }
-  }, [error, toast]);
-
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setReportFile(e.target.files[0]);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!reportFile) {
-      toast({
-        variant: "destructive",
-        title: "No file selected",
-        description: "Please select a credit report PDF to analyze.",
+        variant: 'destructive',
+        title: 'No file selected',
+        description: 'Please select a credit report PDF to analyze.',
       });
       return;
     }
-    if (!user) {
-        toast({
-            variant: "destructive",
-            title: "Not authenticated",
-            description: "You must be logged in to upload a report.",
-        });
-        return;
-    }
-
     setLoading(true);
     setError(null);
+    setAnalysis(null);
 
     try {
-      const creditReportDataUri = await fileToDataURI(reportFile);
-      
-      const input: AnalyzeCreditReportInput = { 
+      const creditReportDataUri = await fileToDataURI(file);
+
+      const input: AnalyzeCreditReportInput = {
         creditReportDataUri,
-        fullName: user.displayName || 'Current User',
-        email: user.email || 'user@example.com'
       };
-      
+
       const response = await fetch('/api/flows/analyzeCreditReportFlow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,94 +55,118 @@ function CreditReportUploader({ onAnalysisComplete }: { onAnalysisComplete: (ana
       if (!response.ok) {
         throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
       }
-      
-      const analysisResult = await response.json();
-      onAnalysisComplete(analysisResult);
 
-    } catch (error: any) {
-      setError(error.message);
+      const result = await response.json();
+      setAnalysis(result);
+    } catch (err: any) {
+      console.error(err);
+      setError('Failed to analyze credit report.');
+      toast({
+        variant: 'destructive',
+        title: 'Analysis Failed',
+        description: 'Something went wrong. Please try again or use a different file.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="text-center">
-      <CardHeader>
-        <CardTitle>Upload New Credit Report</CardTitle>
-        <CardDescription>Upload a new PDF to get an up-to-date analysis of your credit.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col items-center gap-4">
-        <Label htmlFor="report-upload" className="w-full cursor-pointer rounded-lg border-2 border-dashed border-muted-foreground/50 p-8 hover:bg-muted">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-            <UploadCloud className="h-12 w-12" />
-            <span>{reportFile ? reportFile.name : 'Click or drag to upload a PDF'}</span>
-          </div>
-        </Label>
-        <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
-        <Button onClick={handleUpload} disabled={!reportFile || loading} className="w-full font-bold">
-          {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Analyzing...</> : 'Analyze Report'}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold mb-4 font-headline">Free Credit Analysis</h1>
+      <p className="mb-4 text-muted-foreground">
+        Upload your credit report for an AI-powered deep analysis of your credit profile, 
+        with exact items to dispute and your personalized action plan.
+      </p>
 
-
-function AnalysisDisplay({ analysis }: { analysis: AnalyzeCreditReportOutput | null }) {
-  if (!analysis) {
-    return (
-       <Card>
-            <CardHeader>
-                <CardTitle>Your Credit Analysis</CardTitle>
-                <CardDescription>Upload a credit report to get started.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">Once you upload a report, your detailed analysis will appear here.</p>
-            </CardContent>
-       </Card>
-    )
-  }
-
-  return (
-    <Card>
-        <CardHeader>
-            <CardTitle>Your Credit Analysis</CardTitle>
-            <CardDescription>Generated on: {new Date().toLocaleDateString()}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-            <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: analysis.analysisHtml }} />
-             <section id="items-to-challenge">
-                <h2 className="text-xl font-semibold font-headline my-4">Items We Recommend Challenging</h2>
-                <Button asChild>
-                    <Link href="/disputes">
-                        <FileText className="mr-2"/>
-                        Go to Dispute Center
-                    </Link>
-                </Button>
-            </section>
-        </CardContent>
-    </Card>
-  )
-}
-
-export default function CreditAnalysisPage() {
-  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
-
-  const handleAnalysisComplete = (newAnalysis: AnalyzeCreditReportOutput) => {
-    setAnalysis(newAnalysis);
-  };
-
-  return (
-    <AppLayout>
-      <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-1">
-          <CreditReportUploader onAnalysisComplete={handleAnalysisComplete} />
-        </div>
-        <div className="md:col-span-2">
-            <AnalysisDisplay analysis={analysis} />
-        </div>
+      <div className="mb-4 space-y-2">
+        <Label htmlFor="reportFile">Upload Report</Label>
+        <Input
+          id="reportFile"
+          type="file"
+          accept=".pdf"
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        />
       </div>
-    </AppLayout>
+
+      <Button
+        onClick={handleAnalyze}
+        disabled={!file || loading}
+      >
+        {loading ? <><Loader2 className="mr-2 animate-spin" /> Analyzing...</> : 'Analyze Report'}
+      </Button>
+
+      {error && !analysis && <p className="text-red-500 mt-4">{error}</p>}
+
+      {analysis && (
+        <div className="mt-6 bg-card text-card-foreground p-6 rounded-xl shadow-md space-y-6">
+          <h2 className="text-2xl font-bold border-b pb-2 font-headline">Your Credit Analysis</h2>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-background p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">Derogatory Items</p>
+              <p className="text-2xl font-bold">{analysis.derogatoryCount ?? 0}</p>
+            </div>
+            <div className="bg-background p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">Open Accounts</p>
+              <p className="text-2xl font-bold">{analysis.openAccounts ?? 0}</p>
+            </div>
+            <div className="bg-background p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">Hard Inquiries</p>
+              <p className="text-2xl font-bold">{analysis.inquiryCount ?? 0}</p>
+            </div>
+            <div className="bg-background p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">Total Accounts</p>
+              <p className="text-2xl font-bold">{analysis.totalAccounts ?? 0}</p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Items to Challenge</h3>
+            {analysis.challengeItems?.length ? (
+              <ul className="space-y-2">
+                {analysis.challengeItems.map((item, idx) => (
+                  <li
+                    key={idx}
+                    className="bg-destructive/10 p-3 rounded-lg flex justify-between items-center"
+                  >
+                    <span className="text-destructive-foreground">{item.name} – {item.reason}</span>
+                    <span className="font-bold text-destructive">
+                      {item.successChance}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground">No items identified for dispute.</p>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Personalized Action Plan</h3>
+            <ul className="list-decimal pl-6 space-y-2 text-muted-foreground">
+              {analysis.actionPlan?.map((step, idx) => (
+                <li key={idx}>{step}</li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="bg-primary/10 p-4 rounded-lg mt-6">
+            <h3 className="text-lg font-bold text-primary mb-2">
+              Unlock Your Full Credit Potential
+            </h3>
+            <p className="text-primary/90">
+              Upgrade to unlock automated dispute letter generation, printing, and certified mailing.
+              Take action now to remove negative items and boost your score faster.
+            </p>
+            <Button asChild className="mt-3">
+                 <Link href="/credits">
+                    View Plans
+                 </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
