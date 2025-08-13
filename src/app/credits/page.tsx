@@ -8,7 +8,6 @@ import { Check, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/context/session-provider";
 import { useToast } from "@/hooks/use-toast";
-import { getStripe } from "@/lib/stripe-client";
 
 const subscriptionPlans = [
     {
@@ -63,30 +62,13 @@ export default function CreditsPage() {
     setLoading(name || `credits-${credits}`);
 
     try {
-        const token = await user.getIdToken();
-        const res = await fetch('/api/checkout', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify('name' in item ? { plan: item, user } : { credits: item, user }),
+        // Mock checkout
+        await new Promise(resolve => setTimeout(resolve, 1500));
+         toast({
+            title: "Purchase not implemented",
+            description: "This is a demo. No real purchase was made."
         });
 
-        const { sessionId, error } = await res.json();
-        if (error) {
-            throw new Error(error);
-        }
-        if (!sessionId) {
-            throw new Error("Could not create checkout session");
-        }
-        
-        const stripe = await getStripe();
-        const { error: stripeError } = await stripe!.redirectToCheckout({ sessionId });
-
-        if (stripeError) {
-            throw stripeError;
-        }
 
     } catch (err: any) {
          toast({

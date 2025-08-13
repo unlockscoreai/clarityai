@@ -37,25 +37,15 @@ const recommendedDisputes = [
 export default function DisputesPage() {
   const { user } = useSession();
   const router = useRouter();
-  const [isUpgraded, setIsUpgraded] = useState<boolean | null>(null); // null for loading state
+  const [isUpgraded, setIsUpgraded] = useState(false); // Mock state
+  const [loading, setLoading] = useState(false);
+
+  // Note: The original logic to check upgrade status from Firestore has been temporarily removed
+  // to simplify and isolate the Genkit flow issue.
+  // We will re-implement this once the core analysis functionality is stable.
   
-  useEffect(() => {
-    if (user) {
-      const checkUpgradeStatus = async () => {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          setIsUpgraded(userDoc.data().upgraded || false);
-        } else {
-          setIsUpgraded(false);
-        }
-      };
-      checkUpgradeStatus();
-    }
-  }, [user]);
 
-
-  if (isUpgraded === null) {
+  if (loading) {
     return (
         <AppLayout>
             <div className="flex justify-center items-center h-full">
