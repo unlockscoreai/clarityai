@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,19 +38,6 @@ function fileToDataURI(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
-
-function AnalysisPreview({ htmlContent }: { htmlContent: string }) {
-    const previewContent = useMemo(() => {
-        // Creates a temporary div to parse the HTML string
-        const doc = new DOMParser().parseFromString(htmlContent, 'text/html');
-        // We'll take the first 3 sections as a preview
-        const sections = Array.from(doc.querySelectorAll('body > *')).slice(0, 3);
-        return sections.map(el => el.outerHTML).join('');
-    }, [htmlContent]);
-
-    return <div className="prose max-w-none dark:prose-invert" dangerouslySetInnerHTML={{ __html: previewContent }} />;
-}
-
 
 export function SignupForm() {
   const router = useRouter();
@@ -106,8 +93,6 @@ export function SignupForm() {
       const creditReportDataUri = await fileToDataURI(reportFile);
       const input: AnalyzeCreditReportInput = { 
           creditReportDataUri,
-          fullName,
-          email
       };
       
       const response = await fetch('/api/flows/analyzeCreditReportFlow', {
@@ -233,8 +218,36 @@ export function SignupForm() {
                         Here's a preview. Create an account to unlock your full report and credit boosters.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    {analysis && <AnalysisPreview htmlContent={analysis.analysisHtml} />}
+                <CardContent className="space-y-4">
+                    {analysis && (
+                      <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                              <div className="bg-background p-3 rounded-lg">
+                                  <p className="text-sm text-muted-foreground">Derogatory Items</p>
+                                  <p className="text-xl font-bold">{analysis.derogatoryCount ?? 0}</p>
+                              </div>
+                               <div className="bg-background p-3 rounded-lg">
+                                  <p className="text-sm text-muted-foreground">Hard Inquiries</p>
+                                  <p className="text-xl font-bold">{analysis.inquiryCount ?? 0}</p>
+                              </div>
+                          </div>
+                           <div>
+                              <h3 className="text-md font-semibold mb-2">Top Items to Challenge:</h3>
+                              {analysis.challengeItems?.length ? (
+                                <ul className="space-y-1">
+                                  {analysis.challengeItems.slice(0,2).map((item, idx) => (
+                                    <li key={idx} className="bg-destructive/10 p-2 rounded-lg flex justify-between items-center text-sm">
+                                      <span className="text-destructive-foreground">{item.name}</span>
+                                      <span className="font-bold text-destructive">{item.successChance}%</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">No specific items identified for dispute.</p>
+                              )}
+                          </div>
+                      </div>
+                    )}
                     <div className="relative mt-4">
                         <div className="absolute inset-0 flex items-center">
                             <span className="w-full border-t" />
@@ -266,11 +279,11 @@ export function SignupForm() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="fullName">Full Name</Label>
-                            <Input id="fullName" value={fullName} required readOnly disabled />
+                            <Input id="fullName" value={fullName} required onChange={e => setFullName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={email} required readOnly disabled />
+                            <Input id="email" type="email" value={email} required onChange={e => setEmail(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
@@ -300,3 +313,5 @@ export function SignupForm() {
     </Card>
   );
 }
+
+    
