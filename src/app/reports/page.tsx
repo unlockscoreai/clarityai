@@ -9,6 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSession } from '@/context/session-provider';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
 
 function fileToDataURI(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -25,6 +28,7 @@ export default function ReportsPage() {
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { user } = useSession();
 
   const handleAnalyze = async () => {
     if (!file) {
@@ -32,6 +36,14 @@ export default function ReportsPage() {
         variant: 'destructive',
         title: 'No file selected',
         description: 'Please select a credit report PDF to analyze.',
+      });
+      return;
+    }
+     if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Not Authenticated',
+        description: 'You must be logged in to analyze a report.',
       });
       return;
     }
@@ -58,6 +70,19 @@ export default function ReportsPage() {
 
       const result = await response.json();
       setAnalysis(result);
+
+      // Save the analysis to Firestore
+      await setDoc(doc(db, "reports", user.uid), {
+          ...result,
+          fileName: file.name,
+          createdAt: new Date(),
+      });
+
+      toast({
+        title: 'Analysis Complete',
+        description: 'Your new report has been analyzed and saved.',
+      });
+
     } catch (err: any) {
       console.error(err);
       setError('Failed to analyze credit report.');
