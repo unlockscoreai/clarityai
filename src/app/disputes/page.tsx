@@ -46,17 +46,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  generateDisputeLetter,
   GenerateDisputeLetterInput,
   GenerateDisputeLetterOutput,
 } from "@/ai/flows/dispute-letter-generator";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 type ChallengeItem = AnalyzeCreditReportOutput["challengeItems"][0];
 
 export default function DisputesPage() {
   const { user, loading: userLoading } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   const [isUpgraded, setIsUpgraded] = useState(false);
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,11 @@ export default function DisputesPage() {
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
+           toast({
+              variant: "destructive",
+              title: "Error",
+              description: "Could not load your dispute data.",
+            });
         } finally {
           setLoading(false);
         }
@@ -104,7 +110,7 @@ export default function DisputesPage() {
     } else if (!userLoading) {
       setLoading(false);
     }
-  }, [user, userLoading]);
+  }, [user, userLoading, toast]);
 
   const handleOpenDialog = (item: ChallengeItem) => {
     setSelectedItem(item);
@@ -131,9 +137,12 @@ export default function DisputesPage() {
         disputeReasons: [selectedItem.reason],
       };
       
-      const response = await fetch('/api/flows/generateDisputeLetterFlow', {
+      const response = await fetch('/api/flows/generateDisputeLetter', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await user.getIdToken()}`,
+        },
         body: JSON.stringify(input),
       });
 
@@ -146,6 +155,11 @@ export default function DisputesPage() {
 
     } catch (error) {
         console.error("Failed to generate letter", error);
+        toast({
+            variant: "destructive",
+            title: "Generation Failed",
+            description: "There was an error generating your letter. Please try again.",
+        });
     } finally {
         setIsGenerating(false);
     }
@@ -205,7 +219,7 @@ export default function DisputesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!analysis || !analysis.challengeItems ? (
+            {!analysis || !analysis.challengeItems || analysis.challengeItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
                 <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
@@ -230,9 +244,7 @@ export default function DisputesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analysis.challengeItems &&
-                  analysis.challengeItems.length > 0 ? (
-                    analysis.challengeItems.map((dispute, index) => (
+                  {analysis.challengeItems.map((dispute, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">
                           {dispute.name}
@@ -258,15 +270,7 @@ export default function DisputesPage() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
-                        Congratulations! No disputable items were found in your
-                        report.
-                      </TableCell>
-                    </TableRow>
-                  )}
+                    ))}
                 </TableBody>
               </Table>
             )}
@@ -330,7 +334,7 @@ export default function DisputesPage() {
                    <Textarea readOnly className="w-full h-96 bg-background" value={letterData.letterContent} />
                 </div>
                  <DialogFooter>
-                     <Button variant="outline" onClick={() => { navigator.clipboard.writeText(letterData.letterContent) }}>Copy Text</Button>
+                     <Button variant="outline" onClick={() => { navigator.clipboard.writeText(letterData.letterContent); toast({title: "Copied to clipboard!"}) }}>Copy Text</Button>
                     <Button onClick={() => setIsLetterDialogOpen(false)}>Close</Button>
                 </DialogFooter>
             </>
