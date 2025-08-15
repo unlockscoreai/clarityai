@@ -26,7 +26,7 @@ const GenerateDisputeLetterInputSchema = z.object({
 export type GenerateDisputeLetterInput = z.infer<typeof GenerateDisputeLetterInputSchema>;
 
 const GenerateDisputeLetterOutputSchema = z.object({
-  letterContent: z.string().describe('The generated dispute letter content in Markdown format.'),
+  letterContent: z.string().describe('The generated dispute letter content in plain text format.'),
 });
 export type GenerateDisputeLetterOutput = z.infer<typeof GenerateDisputeLetterOutputSchema>;
 
@@ -58,15 +58,17 @@ const disputeLetterPrompt = ai.definePrompt({
   9.  **Add an "Enclosures" section** at the bottom, listing "Copy of Driver's License" and "Copy of Utility Bill" as proof of identity and address.
 
   **Do not invent any information.** Use only the data provided in the input.
+  **The entire output must be plain text, not Markdown.**
 
   **Input Data:**
   \`\`\`json
-  {{{json input}}}
+  {{{json this}}}
   \`\`\`
 
-  Output the complete letter content in plain text/Markdown format.
+  Output the complete letter content in plain text format.
   `,
 });
+
 
 const generateDisputeLetterFlow = ai.defineFlow(
   {
@@ -75,7 +77,7 @@ const generateDisputeLetterFlow = ai.defineFlow(
     outputSchema: GenerateDisputeLetterOutputSchema,
   },
   async input => {
-    const {output} = await disputeLetterPrompt({ input });
+    const {output} = await disputeLetterPrompt(input);
     return output!;
   }
 );
