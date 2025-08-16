@@ -11,7 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { doc, runTransaction, serverTimestamp, collection, addDoc, increment } from 'firebase/firestore';
+import { doc, runTransaction, serverTimestamp, collection, addDoc, increment, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
 export const GenerateDisputeLetterInputSchema = z.object({
@@ -32,10 +32,6 @@ export const GenerateDisputeLetterOutputSchema = z.object({
   letterId: z.string().describe('The ID of the newly created letter document in Firestore.'),
 });
 export type GenerateDisputeLetterOutput = z.infer<typeof GenerateDisputeLetterOutputSchema>;
-
-export async function generateDisputeLetter(input: GenerateDisputeLetterInput): Promise<GenerateDisputeLetterOutput> {
-  return generateDisputeLetterFlow(input);
-}
 
 const disputeLetterPrompt = ai.definePrompt({
   name: 'disputeLetterPrompt',
@@ -72,7 +68,7 @@ const disputeLetterPrompt = ai.definePrompt({
 });
 
 
-const generateDisputeLetterFlow = ai.defineFlow(
+export const generateDisputeLetterFlow = ai.defineFlow(
   {
     name: 'generateDisputeLetterFlow',
     inputSchema: GenerateDisputeLetterInputSchema,
@@ -80,7 +76,11 @@ const generateDisputeLetterFlow = ai.defineFlow(
   },
   async (input, context) => {
 
-    const userRef = doc(db, "users", context.auth.uid);
+    if (!context?.auth) {
+        throw new Error("User must be authenticated to generate letters.");
+    }
+    const uid = context.auth.uid;
+    const userRef = doc(db, "users", uid);
     const lettersCollectionRef = collection(db, "letters");
 
     try {
@@ -110,7 +110,7 @@ const generateDisputeLetterFlow = ai.defineFlow(
             // 3. Store Letter in Firestore (within transaction)
             const newLetterRef = doc(lettersCollectionRef); // Create a new ref with a unique ID
             const letterData = {
-                userId: context.auth.uid,
+                userId: uid,
                 ...input,
                 letterContent,
                 createdAt: serverTimestamp(),

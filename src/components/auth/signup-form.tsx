@@ -81,16 +81,12 @@ export function SignupForm() {
     setError(null);
 
     try {
-      const fileBuffer = await reportFile.arrayBuffer();
-      const input: AnalyzeCreditReportInput = {
-        fileData: Array.from(new Uint8Array(fileBuffer)),
-        fileName: reportFile.name,
-      };
+      const formData = new FormData();
+      formData.append('file', reportFile);
       
-      const response = await fetch('/api/flows/analyzeCreditReport', {
+      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(input),
+        body: formData,
       });
 
       if (!response.ok) {

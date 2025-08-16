@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AnalyzeCreditReportInput, AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -44,20 +44,16 @@ export default function ReportsPage() {
     setAnalysis(null);
 
     try {
-      const fileBuffer = await file.arrayBuffer();
-      const input: AnalyzeCreditReportInput = {
-        fileData: Array.from(new Uint8Array(fileBuffer)),
-        fileName: file.name,
-      };
-
+      const formData = new FormData();
+      formData.append('file', file);
+      
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/flows/analyzeCreditReport', {
+      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify(input),
+        body: formData,
       });
 
       if (!response.ok) {
