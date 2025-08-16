@@ -1,11 +1,15 @@
 
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
-import { firebaseConfig } from './client-config';
+import * as admin from 'firebase-admin';
+import { serviceAccount } from './service-account'; // Using service account for admin access
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+
+const db = admin.firestore();
 
 const creditBoosters = [
     {
@@ -70,21 +74,22 @@ const affiliateStats = [
 
 async function seedDatabase() {
     console.log('Starting to seed the database...');
-    const batch = writeBatch(db);
+    const batch = db.batch();
 
     // Seed creditBoosters
-    const boostersCol = collection(db, 'creditBoosters');
+    const boostersCol = db.collection('creditBoosters');
     creditBoosters.forEach((booster) => {
-        const docRef = doc(boostersCol); // Automatically generate ID
+        const docRef = boostersCol.doc(); // Automatically generate ID
         batch.set(docRef, booster);
     });
     console.log(`${creditBoosters.length} credit boosters prepared for seeding.`);
     
     // Seed affiliateStats
-    const statsCol = collection(db, 'affiliateStats');
+    const statsCol = db.collection('affiliateStats');
     affiliateStats.forEach((stat) => {
-        const docRef = doc(statsCol, stat.id); // Use specific ID
-        batch.set(docRef, stat);
+        const docRef = statsCol.doc(stat.id); // Use specific ID
+        const { id, ...statData } = stat;
+        batch.set(docRef, statData);
     });
     console.log(`${affiliateStats.length} affiliate stats prepared for seeding.`);
 
