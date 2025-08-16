@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import type { Stripe } from 'stripe';
-import { doc, updateDoc, serverTimestamp, increment } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, increment, runTransaction } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 // Helper to determine credits to add from line items
@@ -23,6 +23,19 @@ const getCreditsFromLineItems = (lineItems: Stripe.LineItem[]): number => {
     });
     return credits;
 }
+
+const getCreditsFromCoupon = (session: Stripe.Checkout.Session): number => {
+    if (session.total_details?.amount_discounted && session.discounts?.length) {
+      for (const discount of session.discounts) {
+          // Ensure discount.coupon is not a string ID
+          if (typeof discount.coupon !== 'string' && discount.coupon?.metadata?.credits) {
+              return parseInt(discount.coupon.metadata.credits, 10);
+          }
+      }
+    }
+    return 0;
+}
+
 
 export async function POST(req: NextRequest) {
   const payload = await req.text();
@@ -53,10 +66,13 @@ export async function POST(req: NextRequest) {
 
     try {
       // Retrieve line items to determine what was purchased
-      const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { expand: ['data.price.product'] });
       
-      const creditsToAdd = getCreditsFromLineItems(lineItems.data);
-      const planName = lineItems.data[0].price?.product.name ?? 'Pro'; // Default or derive more robustly
+      const creditsFromPurchase = getCreditsFromLineItems(lineItems.data);
+      const creditsFromCoupon = getCreditsFromCoupon(session);
+      const totalCreditsToAdd = creditsFromPurchase + creditsFromCoupon;
+      
+      const planName = lineItems.data[0].price?.product.name ?? 'Pro'; 
 
       const userDocRef = doc(db, "users", firebaseUID);
       
@@ -65,13 +81,12 @@ export async function POST(req: NextRequest) {
           updatedAt: serverTimestamp()
       };
 
-      if (creditsToAdd > 0) {
-        updateData.credits = increment(creditsToAdd);
+      if (totalCreditsToAdd > 0) {
+        updateData.credits = increment(totalCreditsToAdd);
       }
       
-      // Determine if a subscription plan was purchased
       const isSubscription = lineItems.data.some(item => 
-          item.price?.product.name.toLowerCase() in ['starter', 'pro', 'vip']
+          item.price?.product.name && ['starter', 'pro', 'vip'].includes(item.price.product.name.toLowerCase())
       );
 
       if (isSubscription) {
@@ -80,7 +95,7 @@ export async function POST(req: NextRequest) {
 
       await updateDoc(userDocRef, updateData);
 
-      console.log(`Successfully processed checkout for user: ${firebaseUID}. Credits added: ${creditsToAdd}`);
+      console.log(`Successfully processed checkout for user: ${firebaseUID}. Total credits added: ${totalCreditsToAdd}`);
 
     } catch (dbError: any) {
         console.error('Error updating Firestore from webhook:', dbError);
