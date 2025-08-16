@@ -32,7 +32,7 @@ import {
   Loader2,
   MailWarning,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/session-provider";
 import { useRouter } from "next/navigation";
@@ -131,20 +131,32 @@ function EmailVerificationBanner() {
     const { user } = useSession();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [resendCooldown, setResendCooldown] = useState(0);
+
+    // Countdown timer effect
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setInterval(() => {
+            setResendCooldown(prev => prev - 1);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [resendCooldown]);
 
     if (!user || user.emailVerified) {
         return null;
     }
 
     const handleResend = async () => {
-        if (!user) return;
+        if (!user || resendCooldown > 0) return;
+
         setLoading(true);
         try {
             await sendEmailVerification(user);
             toast({
                 title: "Verification Email Sent",
-                description: "A new verification link has been sent to your email address.",
+                description: `A new verification link has been sent to ${user.email}.`,
             });
+            setResendCooldown(60); // Start 60-second cooldown
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -162,9 +174,9 @@ function EmailVerificationBanner() {
             <AlertTitle>Verify Your Email Address</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
                 Please check your inbox to verify your email. This is required to secure your account.
-                <Button onClick={handleResend} variant="outline" size="sm" disabled={loading}>
-                    {loading ? <Loader2 className="animate-spin mr-2"/> : null}
-                    Resend Verification
+                <Button onClick={handleResend} variant="outline" size="sm" disabled={loading || resendCooldown > 0}>
+                    {loading && <Loader2 className="animate-spin mr-2"/>}
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Verification"}
                 </Button>
             </AlertDescription>
         </Alert>
