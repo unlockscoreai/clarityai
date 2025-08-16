@@ -19,6 +19,8 @@ import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { fetchLeaderboard, type AffiliateStat } from "@/lib/firebase/queries";
+import { useToast } from "@/hooks/use-toast";
 
 
 // Mock Data for demonstration purposes
@@ -37,14 +39,6 @@ const MOCK_PLAN_DATA = [
     { name: "VIP", value: 5 },
 ];
 
-const MOCK_LEADERBOARD = [
-    { name: "John Doe", earnings: 5250 },
-    { name: "Jane Smith", earnings: 4800 },
-    { name: "Michael B.", earnings: 4750 },
-    { name: "Your Affiliate", earnings: 950 },
-    { name: "Emily White", earnings: 850 },
-].sort((a,b) => b.earnings - a.earnings);
-
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--chart-3))"];
 
@@ -62,11 +56,26 @@ const chartConfig = {
 export default function AffiliateReportsPage() {
   const { user, loading: userLoading } = useSession();
   const [loading, setLoading] = useState(false); // Used for async data fetching in future
+  const { toast } = useToast();
   
   // In a real app, these would be fetched from Firestore
   const [monthlyData, setMonthlyData] = useState(MOCK_MONTHLY_DATA);
   const [planData, setPlanData] = useState(MOCK_PLAN_DATA);
-  const [leaderboard, setLeaderboard] = useState(MOCK_LEADERBOARD);
+  const [leaderboard, setLeaderboard] = useState<AffiliateStat[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    fetchLeaderboard()
+      .then(setLeaderboard)
+      .catch(err => {
+          console.error("Failed to fetch leaderboard:", err);
+          toast({ variant: "destructive", title: "Error", description: "Could not load leaderboard data."})
+      })
+      .finally(() => setLoading(false));
+
+  }, [user, toast]);
 
 
   return (
@@ -85,7 +94,7 @@ export default function AffiliateReportsPage() {
           </p>
         </div>
 
-        {loading || userLoading ? (
+        {userLoading ? (
             <div className="flex justify-center items-center h-64">
                 <Loader2 className="animate-spin text-primary" />
             </div>
@@ -151,6 +160,9 @@ export default function AffiliateReportsPage() {
                         <CardDescription>See how you stack up against other top affiliates.</CardDescription>
                     </CardHeader>
                     <CardContent>
+                       {loading ? (
+                         <div className="flex justify-center items-center h-40"><Loader2 className="animate-spin text-primary"/></div>
+                       ) : (
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -161,14 +173,15 @@ export default function AffiliateReportsPage() {
                             </TableHeader>
                             <TableBody>
                                 {leaderboard.map((a, i) => (
-                                    <TableRow key={i} className={a.name === "Your Affiliate" ? "bg-accent/50" : ""}>
+                                    <TableRow key={a.id} className={a.id === user?.uid ? "bg-accent/50" : ""}>
                                         <TableCell className="font-bold">{i+1}</TableCell>
-                                        <TableCell>{a.name}</TableCell>
-                                        <TableCell className="text-right font-medium">${a.earnings.toLocaleString()}</TableCell>
+                                        <TableCell>{a.name || 'Anonymous Affiliate'}</TableCell>
+                                        <TableCell className="text-right font-medium">${(a.totalRevenue || 0).toLocaleString()}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
+                       )}
                     </CardContent>
                 </Card>
             </div>

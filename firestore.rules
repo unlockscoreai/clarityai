@@ -1,36 +1,52 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper function to check if a user is an authenticated affiliate
+    function isAffiliate(userId) {
+      return exists(/databases/$(database)/documents/affiliates/$(userId));
+    }
+
+    // Users can read/write their own data
     match /users/{userId} {
       allow read, write: if request.auth.uid == userId;
     }
 
-    match /reports/{reportId} {
-        allow read, write: if request.auth.uid == resource.data.userId;
+    // Users can read and create their own reports, but not update/delete
+    match /reports/{userId} {
+        allow read, create: if request.auth.uid == userId;
     }
-
-    match /affiliates/{affiliateId} {
-      allow create;
-      allow read, update: if request.auth.uid == affiliateId;
-      allow update: if request.auth.uid == resource.data.referrerId && "credits" in request.resource.data && "referrals" in request.resource.data;
-
-      match /clients/{clientId} {
-        allow read, write: if request.auth.uid == affiliateId;
-      }
-      
-      match /referredAffiliates/{referredId} {
-        allow read: if request.auth.uid == affiliateId;
-      }
-    }
-
+    
+    // Users can manage their own dispute letters
     match /letters/{letterId} {
-      allow read, write: if request.auth.uid == resource.data.userId;
+      allow read, create, update, delete: if request.resource.data.userId == request.auth.uid;
     }
 
+    // World-readable, webhook-writable transaction logs
     match /transactions/{transactionId} {
-      allow read: if request.auth.uid == resource.data.userId;
+        allow read: if request.auth != null;
+        allow write: if false; // Only backend can write
+    }
+
+    // Public can create affiliate accounts
+    // Affiliates can update their own accounts
+    match /affiliates/{affiliateId} {
+      allow create; // For new signups
+      allow read: if request.auth != null;
+      allow update: if request.auth.uid == affiliateId || isAffiliate(request.auth.uid); // Allow self-update or other affiliates to update (for referrals)
+    }
+
+    // Affiliates can manage clients in their own subcollection
+    match /affiliates/{affiliateId}/clients/{clientId} {
+        allow read, write: if request.auth.uid == affiliateId;
+    }
+
+    // Authenticated users can read aggregated stats for leaderboards
+    match /affiliateStats/{affiliateId} {
+        allow read: if request.auth != null;
+        allow write: if false; // Only backend can write
     }
   }
 }
