@@ -17,29 +17,23 @@ import {
   Loader2,
   UploadCloud,
   FileCheck,
-  Lock,
+  Mail,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore"; 
-import { auth, db } from "@/lib/firebase/client";
+import { getAuth, sendSignInLinkToEmail } from "firebase/auth";
 
-type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
+type SignupStep = "upload" | "analyzing" | "preview";
 
 export function SignupForm() {
-  const router = useRouter();
   const { toast } = useToast();
 
   const [step, setStep] = useState<SignupStep>("upload");
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const [analysis, setAnalysis] = useState<AnalyzeCreditProfileOutput | null>(null);
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,75 +86,30 @@ export function SignupForm() {
         throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
       }
 
-      const analysisResult: AnalyzeCreditProfileOutput = await response.json();
-      setAnalysis(analysisResult);
+      const analysisResult: AnalyzeCreditProfileOutput & { fullName?: string } = await response.json();
+      
+      // Send sign-in link
+      const auth = getAuth();
+      const actionCodeSettings = {
+        url: `${window.location.origin}/finish-signup`,
+        handleCodeInApp: true,
+      };
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+
+      // Store email and analysis results in local storage to be picked up after verification
+      window.localStorage.setItem('emailForSignIn', email);
+      analysisResult.fullName = fullName; // Add fullName to the object
+      window.localStorage.setItem('analysisResult', JSON.stringify(analysisResult));
+
       setStep("preview");
 
     } catch (err: any) {
       setError(err.message);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleCreateAccount = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!password) {
-        toast({ variant: "destructive", title: "Password is required."});
-        return;
-    }
-    setLoading(true);
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        // Update Firebase Auth profile
-        await updateProfile(user, { displayName: fullName });
-
-        // Check for test user
-        const isTestUser = user.email === 'test@test.com';
-        const plan = isTestUser ? 'vip' : 'starter';
-        const credits = isTestUser ? 100 : 1;
-
-        // Store user info in Firestore
-        await setDoc(doc(db, "users", user.uid), {
-            fullName: fullName,
-            email: user.email,
-            subscription: {
-              plan: plan,
-              status: 'active',
-              stripeSessionId: null
-            },
-            credits: credits,
-            createdAt: serverTimestamp()
-        });
-
-        // Store report in Firestore
-        if (analysis) {
-            const reportsCollectionRef = collection(db, "reports");
-            await addDoc(reportsCollectionRef, {
-                ...analysis,
-                userId: user.uid,
-                fileName: reportFile?.name,
-                createdAt: serverTimestamp(),
-            });
-        }
-
-        toast({
-            title: "Account Created!",
-            description: "Welcome to Credit Clarity AI. Your full report is now available.",
-        });
-        router.push('/dashboard');
-    } catch (error: any) {
-         toast({
-            variant: "destructive",
-            title: "Account Creation Failed",
-            description: error.message || "An unexpected error occurred.",
-        });
-    } finally {
-        setLoading(false);
-    }
-  };
 
   const renderStep = () => {
     switch (step) {
@@ -192,7 +141,7 @@ export function SignupForm() {
                     </Label>
                     <Input id="report-upload" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} />
                     <Button type="submit" disabled={!reportFile || !fullName || !email || loading} className="w-full font-bold">
-                        {loading ? <Loader2 className="animate-spin" /> : "Analyze My Report"}
+                        {loading ? <Loader2 className="animate-spin" /> : "Analyze & Get Sign-In Link"}
                     </Button>
                 </CardContent>
             </form>
@@ -204,91 +153,28 @@ export function SignupForm() {
                 <Loader2 className="h-16 w-16 animate-spin text-primary" />
                 <h2 className="text-2xl font-headline font-semibold">Analyzing Your Report...</h2>
                 <p className="text-muted-foreground text-center">
-                    Our AI is securely scanning your file to find opportunities. This may take a moment.
+                    Our AI is securely scanning your file. A sign-in link will be sent to your email once complete.
                 </p>
             </CardContent>
         );
       case "preview":
         return (
             <>
-                <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold text-primary">Your Analysis is Ready!</CardTitle>
+                <CardHeader className="text-center">
+                    <Mail className="mx-auto h-12 w-12 text-primary" />
+                    <CardTitle className="text-3xl font-headline font-bold text-primary">Check Your Email!</CardTitle>
                     <CardDescription className="font-body">
-                        Here's a preview. Create an account to unlock your full report and credit boosters.
+                        A secure link to access your analysis and create your account has been sent to <strong>{email}</strong>.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {analysis && (
-                      <div className="space-y-4">
-                           <div className="bg-background p-3 rounded-lg text-center">
-                               <p className="text-sm text-muted-foreground">Disputable Items Found</p>
-                               <p className="text-xl font-bold">{analysis.disputableItems?.length ?? 0}</p>
-                           </div>
-                           <div>
-                              <h3 className="text-md font-semibold mb-2">Top Items to Challenge:</h3>
-                              {analysis.disputableItems?.length ? (
-                                <ul className="space-y-1">
-                                  {analysis.disputableItems.slice(0,2).map((item, idx) => (
-                                    <li key={idx} className="bg-accent text-accent-foreground p-2 rounded-lg flex justify-between items-center text-sm">
-                                      <span className="truncate max-w-[200px]">{item.item}</span>
-                                      <span className="font-bold">{item.successProbability}% chance</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : (
-                                <p className="text-sm text-muted-foreground">No specific items identified for dispute.</p>
-                              )}
-                          </div>
-                      </div>
-                    )}
-                    <div className="relative mt-4">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-card px-2 text-muted-foreground">Unlock Full Report</span>
-                        </div>
-                    </div>
-                     <div className="mt-4 flex flex-col items-center justify-center gap-2 rounded-lg border bg-slate-50/50 p-4 text-center dark:bg-slate-800/20">
-                        <Lock className="h-8 w-8 text-primary" />
-                        <p className="font-semibold">Create your account to continue.</p>
-                        <Button onClick={() => setStep('create_account')} className="w-full font-bold">
-                            Create Account & View Full Report
-                        </Button>
-                    </div>
+                <CardContent>
+                     <div className="text-center p-4 rounded-lg bg-background">
+                         <p className="text-muted-foreground">Click the link in the email to securely sign in and view your full credit analysis.
+                         </p>
+                     </div>
                 </CardContent>
             </>
         );
-      case "create_account":
-        return (
-            <>
-                <CardHeader>
-                    <CardTitle className="text-3xl font-headline font-bold text-primary">Almost there!</CardTitle>
-                    <CardDescription className="font-body">
-                        Create your account to save your analysis and start improving your credit.
-                    </CardDescription>
-                </CardHeader>
-                <form onSubmit={handleCreateAccount}>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="fullName">Full Name</Label>
-                            <Input id="fullName" value={fullName} required onChange={e => setFullName(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={email} required onChange={e => setEmail(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
-                            <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
-                        </div>
-                        <Button type="submit" className="w-full font-bold" disabled={loading}>
-                            {loading ? <Loader2 className="animate-spin" /> : "Create Account" }
-                        </Button>
-                    </CardContent>
-                </form>
-            </>
-        )
     }
   };
 

@@ -13,6 +13,7 @@ import {
   Settings,
   User,
   Star,
+  LogIn,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -170,6 +171,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {item.label}
                   </Link>
                 ))}
+                 <Link
+                  href="/signup"
+                  className={cn(
+                    "flex items-center gap-4 px-2.5 text-muted-foreground hover:text-foreground",
+                    pathname.startsWith("/signup") && "text-foreground"
+                  )}
+                >
+                  <LogIn className="h-5 w-5" />
+                  Sign Up
+                </Link>
                 <Link
                   href="/settings"
                   className={cn(
@@ -210,5 +221,3 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-    
