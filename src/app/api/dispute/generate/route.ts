@@ -1,17 +1,14 @@
-
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateCreditDisputeLetter, GenerateCreditDisputeLetterInputSchema } from '@/ai/flows/dispute-letter-generator';
 import { auth } from '@/lib/firebase/server';
 import { z } from 'zod';
-
+import { GenerateCreditDisputeLetterInputSchema, generateCreditDisputeLetter } from '@/ai/flows/dispute-letter-generator';
 
 async function getAuthUser(req: NextRequest) {
     const token = req.headers.get('authorization')?.split('Bearer ')[1];
-    if (!token) {
-        return null;
-    }
+    if (!token) return null;
+
     try {
         const decodedToken = await auth.verifyIdToken(token);
         return { uid: decodedToken.uid, ...decodedToken };
@@ -20,7 +17,6 @@ async function getAuthUser(req: NextRequest) {
         return null;
     }
 }
-
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,8 +32,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User must be authenticated.' }, { status: 401 });
     }
 
-    // 4. Call dispute letter generator with auth context
-    const result = await generateCreditDisputeLetter(input, { auth: authUser });
+    // 4. Call dispute letter generator with correct userId
+    const result = await generateCreditDisputeLetter({
+      userId: authUser.uid, // Pass the UID here
+      ...input,
+    });
 
     // 5. Return result
     return NextResponse.json(result, { status: 200 });
@@ -45,9 +44,9 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     // Handle Zod validation errors
     if (err instanceof z.ZodError) {
-        return NextResponse.json({ error: 'Invalid input.', details: err.format() }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid input.', details: err.format() }, { status: 400 });
     }
-    
+
     console.error('Error generating dispute letter:', err);
     return NextResponse.json(
       { error: err.message || 'Failed to generate dispute letter.' },

@@ -4,15 +4,16 @@ import { getAuth } from 'firebase-admin/auth';
 import { credential } from 'firebase-admin';
 
 let app: App;
+
 if (getApps().length === 0) {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    app = initializeApp({
-      credential: credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)),
-    });
-  } else {
-    // initialize without cert on client-side, useful for Storybook
-    app = initializeApp();
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
   }
+  
+  app = initializeApp({
+    credential: credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)),
+  });
+
 } else {
   app = getApp();
 }
