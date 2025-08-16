@@ -13,7 +13,6 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { doc, runTransaction, serverTimestamp, collection, addDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { auth } from '@/lib/firebase/server';
 
 export const GenerateDisputeLetterInputSchema = z.object({
   fullName: z.string().describe('The full name of the person on the report.'),
@@ -80,12 +79,12 @@ const generateDisputeLetterFlow = ai.defineFlow(
     outputSchema: GenerateDisputeLetterOutputSchema,
   },
   async (input, context) => {
-    
-    // 1. Credit Enforcement and Deduction
+
     const userRef = doc(db, "users", context.auth.uid);
-    
+    const lettersCollectionRef = collection(db, "letters");
+
     try {
-        await runTransaction(db, async (transaction) => {
+        const result = await runTransaction(db, async (transaction) => {
             const userDoc = await transaction.get(userRef);
             if (!userDoc.exists()) {
                 throw new Error("User not found.");
@@ -94,42 +93,44 @@ const generateDisputeLetterFlow = ai.defineFlow(
             if (credits < 1) {
                 throw new Error("Not enough credits to generate a letter.");
             }
-            
-            // Decrement credits
+
+            // 1. Deduct credit (within transaction)
             transaction.update(userRef, { credits: increment(-1) });
+            
+            // 2. Generate Letter Content (outside transaction if it's a long-running external call, but fine here)
+            const {text: letterContent} = await ai.generate({
+                prompt: (await disputeLetterPrompt.render({input})).prompt,
+            });
+
+            if (!letterContent) {
+                // By throwing an error here, the transaction will automatically roll back.
+                throw new Error("Failed to generate letter content. Your credit has not been charged.");
+            }
+            
+            // 3. Store Letter in Firestore (within transaction)
+            const newLetterRef = doc(lettersCollectionRef); // Create a new ref with a unique ID
+            const letterData = {
+                userId: context.auth.uid,
+                ...input,
+                letterContent,
+                createdAt: serverTimestamp(),
+                mailed: false, // For auto-mailer service
+            };
+            transaction.set(newLetterRef, letterData);
+
+            return {
+                letterContent,
+                letterId: newLetterRef.id,
+            };
         });
+
+        return result;
+
     } catch (error: any) {
-        // This will catch the "Not enough credits" error and others.
+        // This will catch transaction errors, including the "Not enough credits" error.
+        console.error("Dispute letter transaction failed:", error);
+        // Re-throw the error so the client can handle it.
         throw new Error(error.message || "A transaction error occurred.");
     }
-
-    // 2. Generate Letter Content
-    const {text: letterContent} = await ai.generate({
-        prompt: (await disputeLetterPrompt.render({input})).prompt,
-    });
-    
-    if (!letterContent) {
-        // A more robust solution could involve a "credit hold" and "commit" pattern,
-        // or a compensating transaction to refund the credit.
-        console.error("AI failed to generate letter content after credit deduction.");
-        await updateDoc(userRef, { credits: increment(1) }); // Refund credit
-        throw new Error("Failed to generate letter content. Your credit has been refunded.");
-    }
-    
-    // 3. Store Letter in Firestore
-    const letterData = {
-        userId: context.auth.uid,
-        ...input,
-        letterContent,
-        createdAt: serverTimestamp(),
-        mailed: false, // For auto-mailer service
-    };
-
-    const letterDocRef = await addDoc(collection(db, "letters"), letterData);
-
-    return {
-        letterContent,
-        letterId: letterDocRef.id,
-    };
   }
 );
