@@ -16,8 +16,8 @@ import pdf from 'pdf-parse';
 
 // #region Input and Output Schemas
 export const AnalyzeCreditReportInputSchema = z.object({
-  fileData: z.array(z.number()),
-  fileName: z.string(),
+  fileData: z.array(z.number()).describe("The raw byte data of the PDF file."),
+  fileName: z.string().describe("The name of the uploaded file."),
 });
 export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSchema>;
 
@@ -47,6 +47,20 @@ export async function analyzeCreditReport(input: AnalyzeCreditReportInput): Prom
   return analyzeCreditReportFlow(input);
 }
 
+/**
+ * Extracts text from a PDF buffer, with validation.
+ * @param pdfBuffer The PDF file content as a Buffer.
+ * @returns A promise that resolves with the extracted text content.
+ */
+async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+        throw new Error('Uploaded PDF file is empty or invalid.');
+    }
+    const data = await pdf(pdfBuffer);
+    return data.text;
+}
+
+
 const analyzeCreditReportFlow = ai.defineFlow(
   {
     name: 'analyzeCreditReportFlow',
@@ -54,10 +68,9 @@ const analyzeCreditReportFlow = ai.defineFlow(
     outputSchema: AnalyzeCreditReportOutputSchema,
   },
   async (input) => {
-    // 1) Convert bytes -> text
+    // 1) Convert bytes -> text, with validation
     const buffer = Buffer.from(input.fileData);
-    const pdfData = await pdf(buffer);
-    const reportText = pdfData.text;
+    const reportText = await extractPdfText(buffer);
 
     // 2) Ask the model
     const llmResponse = await ai.generate({
