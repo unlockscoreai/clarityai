@@ -74,53 +74,89 @@ export default function DisputesPage() {
   });
 
   useEffect(() => {
-    if (user) {
-      const fetchUserData = async () => {
+    if (userLoading) {
+        return;
+    }
+    if (!user) {
+        setLoading(false);
+        // Let the AppLayout handle the redirect to /login
+        return;
+    }
+
+    const fetchUserData = async () => {
         setLoading(true);
         const userDocRef = doc(db, "users", user.uid);
         const reportDocRef = doc(db, "reports", user.uid);
 
         try {
-          const [userDoc, reportDoc] = await Promise.all([
-            getDoc(userDocRef),
-            getDoc(reportDocRef),
-          ]);
+            const [userDocSnap, reportDocSnap] = await Promise.all([
+                getDoc(userDocRef),
+                getDoc(reportDocRef),
+            ]);
 
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setIsUpgraded(userData?.upgraded === true);
-            setFormValues(prev => ({ ...prev, address: userData?.address || '' }));
-          }
+            if (userDocSnap.exists()) {
+                const userData = userDocSnap.data();
+                setIsUpgraded(userData?.upgraded === true);
+                setFormValues(prev => ({ ...prev, address: userData?.address || '' }));
+            }
 
-          if (reportDoc.exists()) {
-            setAnalysis(reportDoc.data() as AnalyzeCreditReportOutput);
-          }
+            if (reportDocSnap.exists()) {
+                // Here we can use safeParse to be extra sure, though data from Firestore should be trusted
+                const result = AnalyzeCreditReportOutputSchema.safeParse(reportDocSnap.data());
+                 if (result.success) {
+                    setAnalysis(result.data);
+                } else {
+                    console.warn("Invalid report schema in Firestore:", result.error);
+                    setAnalysis(null);
+                }
+            } else {
+                setAnalysis(null);
+            }
         } catch (error) {
-          console.error("Error fetching user data:", error);
-           toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Could not load your dispute data.",
+            console.error("Error fetching user data:", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load your dispute data.",
             });
+            setAnalysis(null); // Clear analysis on error
         } finally {
-          setLoading(false);
+            setLoading(false);
         }
-      };
-      fetchUserData();
-    } else if (!userLoading) {
-      setLoading(false);
-    }
+    };
+    fetchUserData();
   }, [user, userLoading, toast]);
+
 
   const handleOpenDialog = (item: ChallengeItem) => {
     setSelectedItem(item);
-    setLetterData(null);
+    setLetterData(null); // Reset previous letter
+    // Prefill form values if we have them
+    if (user) {
+        getDoc(doc(db, "users", user.uid)).then(docSnap => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setFormValues(prev => ({
+                    ...prev,
+                    address: data.address || '',
+                    // dob: data.dob || '', // Assuming dob is stored
+                }));
+            }
+        });
+    }
     setIsLetterDialogOpen(true);
   };
 
   const handleGenerateLetter = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !selectedItem || !formValues.address || !formValues.dob) return;
+    if (!user || !selectedItem || !formValues.address || !formValues.dob) {
+        toast({
+            variant: "destructive",
+            title: "Missing Information",
+            description: "Please fill out all required fields.",
+        });
+        return;
+    }
     setIsGenerating(true);
     
     try {
@@ -130,8 +166,8 @@ export default function DisputesPage() {
         address: formValues.address,
         creditBureau: formValues.creditBureau,
         disputedItem: {
-            // Assuming item name is in "Creditor - Acct #...1234" format
-            creditor: selectedItem.name.split(' - ')[0],
+            // Assuming item name is in "Creditor - Acct ••1234" format
+            creditor: selectedItem.name.split(' - ')[0] || 'Unknown Creditor',
             accountNumber: selectedItem.name.split(' - ')[1] || 'N/A',
         },
         disputeReasons: [selectedItem.reason],
@@ -248,10 +284,10 @@ export default function DisputesPage() {
                   {analysis.challengeItems.map((dispute, index) => (
                       <TableRow key={index}>
                         <TableCell className="font-medium">
-                          {dispute.name}
+                          {dispute.name || "Unnamed Item"}
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-xs truncate">
-                          {dispute.reason}
+                          {dispute.reason || "No reason provided"}
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-accent text-accent-foreground hover:bg-accent/80">
