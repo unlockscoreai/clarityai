@@ -124,13 +124,19 @@ export function SignupForm() {
 
         // Check for test user
         const isTestUser = user.email === 'test@test.com';
+        const plan = isTestUser ? 'vip' : 'starter';
+        const credits = isTestUser ? 100 : 1;
 
         // Store user info in Firestore
         await setDoc(doc(db, "users", user.uid), {
             fullName: fullName,
             email: user.email,
-            plan: isTestUser ? 'vip' : 'starter',
-            credits: isTestUser ? 100 : 1,
+            subscription: {
+              plan: plan,
+              status: 'active',
+              stripeSessionId: null
+            },
+            credits: credits,
             createdAt: serverTimestamp()
         });
 

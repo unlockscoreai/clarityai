@@ -33,8 +33,10 @@ export async function POST(req: Request) {
     const stripeCustomerId = customer.id;
 
     const line_items = [];
+    let planIdentifier = '';
 
     if (plan) {
+        planIdentifier = plan.name.toLowerCase();
         line_items.push({
             price_data: {
                 currency: 'usd',
@@ -75,6 +77,7 @@ export async function POST(req: Request) {
       metadata: {
         firebaseUID: session.uid,
         stripeCustomerId: stripeCustomerId,
+        plan: planIdentifier,
       },
     };
     

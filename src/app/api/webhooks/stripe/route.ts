@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
     const session = event.data.object as Stripe.Checkout.Session;
     const firebaseUID = session.metadata?.firebaseUID;
     const stripeCustomerId = session.customer;
+    const plan = session.metadata?.plan;
 
     if (!firebaseUID) {
       console.error("Webhook Error: No firebaseUID in session metadata.");
@@ -72,8 +73,6 @@ export async function POST(req: NextRequest) {
       const creditsFromCoupon = getCreditsFromCoupon(session);
       const totalCreditsToAdd = creditsFromPurchase + creditsFromCoupon;
       
-      const planName = lineItems.data[0].price?.product.name ?? 'Pro'; 
-
       const userDocRef = doc(db, "users", firebaseUID);
       
       const updateData: { [key: string]: any } = {
@@ -85,12 +84,10 @@ export async function POST(req: NextRequest) {
         updateData.credits = increment(totalCreditsToAdd);
       }
       
-      const isSubscription = lineItems.data.some(item => 
-          item.price?.product.name && ['starter', 'pro', 'vip'].includes(item.price.product.name.toLowerCase())
-      );
-
-      if (isSubscription) {
-          updateData.plan = planName.toLowerCase();
+      if (plan) {
+          updateData['subscription.plan'] = plan;
+          updateData['subscription.status'] = 'active';
+          updateData['subscription.stripeSessionId'] = session.id;
       }
 
       await updateDoc(userDocRef, updateData);
