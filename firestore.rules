@@ -1,27 +1,48 @@
-rules_version = '2';
 
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read/write their own document
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read, update: if request.auth.uid == userId;
+      // Disallow creation/deletion after signup
+      allow create, delete: if false; 
     }
 
-    // Users can only read/write their own report
-    match /reports/{userId} {
-       allow read, create, update: if request.auth.uid == userId;
+    match /reports/{reportId} {
+      // User can create their own report, and read it.
+      // reportId should be the same as userId for simplicity.
+      allow read, create: if request.auth.uid == reportId && request.auth.uid == request.resource.data.userId;
+      // Reports are immutable
+      allow update, delete: if false;
     }
-    
-    // Users can only create letters for themselves.
-    // Writes (updates for mail status) must be done from a trusted backend (e.g. Cloud Function).
+
+    match /affiliates/{affiliateId} {
+      allow read, write: if request.auth.uid == affiliateId;
+
+      match /clients/{clientId} {
+        allow read, write: if request.auth.uid == affiliateId;
+      }
+
+      match /referredAffiliates/{referredId} {
+        allow read: if request.auth.uid == affiliateId;
+      }
+    }
+
     match /letters/{letterId} {
-      allow read, create: if request.auth.uid == request.resource.data.userId;
-      allow update, delete: if false; // Must be handled by a backend service
+        // User must be authenticated to create a letter.
+        // The user ID in the document must match the authenticated user's ID.
+        allow create: if request.auth.uid != null && request.auth.uid == request.resource.data.userId;
+        
+        // Only the user who created the letter can read it.
+        allow read: if request.auth.uid != null && request.auth.uid == resource.data.userId;
+
+        // Letters are immutable once created.
+        allow update, delete: if false;
     }
 
-    match /{document=**} {
-      allow read, write: if false;
+    match /transactions/{transactionId} {
+      allow read: if request.auth.uid == resource.data.affiliateId;
     }
   }
 }
