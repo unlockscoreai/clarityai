@@ -4,64 +4,51 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if user is an affiliate
+    function isAffiliate(userId) {
+      return exists(/databases/$(database)/documents/affiliates/$(userId));
     }
 
-    // Helper function to check if the user owns the document
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Users can only read/write their own data
     match /users/{userId} {
-      allow read, update, delete: if isAuthenticated() && isOwner(userId);
-      allow create: if isAuthenticated();
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Reports can only be read/created by the owner
+
     match /reports/{reportId} {
-      allow read, create: if isAuthenticated() && isOwner(request.resource.data.userId);
-      // Generally, reports should be immutable
-      allow update, delete: if false; 
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
-    // Letters can only be read/created by the owner
     match /letters/{letterId} {
-       allow read, create: if isAuthenticated() && isOwner(request.resource.data.userId);
-       // Allow owner to update mail status
-       allow update: if isAuthenticated() && isOwner(resource.data.userId);
-       allow delete: if false;
-    }
-
-    // Affiliates can manage their own data and client list
-    match /affiliates/{affiliateId} {
-      allow read, update: if isAuthenticated() && isOwner(affiliateId);
-      allow create: if isAuthenticated();
-      
-      // Clients of an affiliate can be managed by that affiliate
-      match /clients/{clientId} {
-        allow read, write: if isAuthenticated() && isOwner(affiliateId);
-      }
-      // Referred affiliates subcollection
-      match /referredAffiliates/{referredId} {
-        allow read, write: if isAuthenticated() && isOwner(affiliateId);
-      }
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
     }
     
-    // Affiliate stats can be read by anyone, but only written server-side
-    match /affiliateStats/{statId} {
-        allow read: if true;
-        allow write: if false; // Should be updated via a trusted backend process
-    }
-
-    // Credit Boosters are publically readable
     match /creditBoosters/{boosterId} {
-      allow read: if true;
-      allow write: if false; // Should be managed from the backend/console
+        allow read: if true;
+        allow write: if false; // Only manageable from the Firebase Console
+    }
+    
+    match /affiliates/{affiliateId} {
+        // Only the affiliate can read their own data
+        allow read: if request.auth != null && request.auth.uid == affiliateId;
+        // Writes are handled by cloud functions
+        allow write: if false; 
+        
+        // Clients subcollection
+        match /clients/{clientId} {
+            // Affiliate can read/write their own client data
+            allow read, write: if request.auth != null && request.auth.uid == affiliateId;
+        }
+    }
+    
+     match /affiliateStats/{affiliateId} {
+      // Leaderboard is public, but individual stats are not
+      allow read: if true; 
+      // Stats are updated via secure backend processes only
+      allow write: if false;
+    }
+    
+    // Allow unauthenticated access to the createAffiliate function
+    match /functions/createAffiliate {
+      allow create: if true;
     }
   }
 }
-
-    

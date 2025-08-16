@@ -17,9 +17,9 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion, increment } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase/client";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { auth } from "@/lib/firebase/client";
+import { signInWithCustomToken } from "firebase/auth";
 
 export default function AffiliateSignupPage() {
   const router = useRouter();
@@ -37,57 +37,28 @@ export default function AffiliateSignupPage() {
     setLoading(true);
 
     try {
-      // 1. Create Firebase Auth user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await updateProfile(user, { displayName: name });
-      const uid = user.uid;
-
-      // 2. Prepare affiliate data
-      const affiliateData = {
+      const functions = getFunctions();
+      const createAffiliate = httpsCallable(functions, 'createAffiliate');
+      
+      const result: any = await createAffiliate({
         name,
         email,
-        referrerId: null as string | null,
-        clients: [],
-        referrals: [],
-        earnings: 0,
-        credits: 1, // Initial credit bonus
-        tier: 'Starter',
-        createdAt: serverTimestamp(),
-        referralLink: `https://creditclarity.ai/affiliate/signup?ref=${uid}`,
-      };
+        password,
+        referralCode: referralCode || null,
+      });
 
-      // 3. Handle referral logic
-      if (referralCode) {
-        const referrerRef = doc(db, "affiliates", referralCode);
-        const referrerSnap = await getDoc(referrerRef);
-        if (referrerSnap.exists()) {
-          // Add new affiliate to referrer's list and give bonus
-          await updateDoc(referrerRef, {
-            referrals: arrayUnion(uid),
-            credits: increment(1),
-          });
-          // Set referrerId for the new affiliate
-          affiliateData.referrerId = referralCode;
-        } else {
-            toast({
-                variant: "destructive",
-                title: "Invalid Referral Code",
-                description: "The referral code was not found, but your account will be created without it.",
-            });
-        }
+      if (result.data.error) {
+        throw new Error(result.data.error);
       }
-
-      // 4. Create affiliate record in Firestore with all data
-      const affiliateRef = doc(db, "affiliates", uid);
-      await setDoc(affiliateRef, affiliateData);
+      
+      // Sign in the user with the custom token returned from the function
+      await signInWithCustomToken(auth, result.data.token);
 
       toast({
         title: "Affiliate Account Created!",
         description: "Welcome! You're now ready to start.",
       });
 
-      // 5. Redirect to affiliate dashboard
       router.push('/affiliate');
 
     } catch (error: any) {
