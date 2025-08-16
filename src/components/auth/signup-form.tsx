@@ -95,7 +95,7 @@ export function SignupForm() {
           creditReportDataUri,
       };
       
-      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+      const response = await fetch('/api/flows/analyzeCreditReport', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -130,13 +130,16 @@ export function SignupForm() {
         // Update Firebase Auth profile
         await updateProfile(user, { displayName: fullName });
 
+        // Check for test user
+        const isTestUser = user.email === 'test@test.com';
+
         // Store user info in Firestore
         await setDoc(doc(db, "users", user.uid), {
             fullName: fullName,
             email: user.email,
-            upgraded: false,
-            plan: null,
-            upgradeDate: null,
+            upgraded: isTestUser, // Set upgraded to true for test user
+            plan: isTestUser ? 'VIP' : null,
+            upgradeDate: isTestUser ? new Date() : null,
         });
 
         // Store report in Firestore
@@ -313,5 +316,3 @@ export function SignupForm() {
     </Card>
   );
 }
-
-    
