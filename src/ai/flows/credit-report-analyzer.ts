@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Analyzes a credit report against a checklist for a high Unlock Score.
@@ -17,7 +16,12 @@ const AnalyzeCreditProfileInputSchema = z.object({
 export type AnalyzeCreditProfileInput = z.infer<typeof AnalyzeCreditProfileInputSchema>;
 
 const AnalyzeCreditProfileOutputSchema = z.object({
-  summary: z.string().describe('A brief summary of the credit profile analysis.'),
+  summary: z.string().describe('A brief, encouraging summary of the credit profile.'),
+  factors: z.array(z.object({
+    title: z.string().describe('The name of the credit factor (e.g., "Payment History").'),
+    description: z.string().describe('A description of the user\'s status for this factor.'),
+    impact: z.string().describe('The potential score impact or advice related to this factor (e.g., "+20 points if reduced below 30%").'),
+  })).describe('A breakdown of the analysis by credit factor.'),
   actionItems: z.array(z.string()).describe('A list of personalized action items to improve the credit profile.'),
   disputableItems: z.array(
     z.object({
@@ -68,7 +72,7 @@ const analyzeCreditProfileFlow = ai.defineFlow(
   async (input) => {
     
     const prompt = `
-You are a professional credit analyst. Analyze the provided credit report PDF, generate a summary and action plan, and identify potentially disputable items.
+You are a professional credit analyst with an encouraging and optimistic tone. Your goal is to empower the user to improve their credit. Analyze the provided credit report PDF and generate a detailed analysis.
 
 Checklist for a strong credit profile:
 ${checklist}
@@ -79,16 +83,19 @@ Analyze this credit report:
 ---
 
 Instructions:
-1.  Directly analyze the provided PDF. Parse key metrics like FICO score, payment history, credit utilization, account types and ages, and inquiries.
-2.  Compare the user's profile against the provided checklist.
-3.  Write a concise **Summary** of the overall credit profile.
-4.  Create a list of concrete, actionable **Action Items** the user can take to improve their credit profile based on the checklist.
-5.  Identify all negative or potentially incorrect items. For each one, create a **Disputable Item** with:
-    -   `item`: The name of the account or item (e.g., "XYZ Collections - Acct #1234").
-    -   `reason`: A clear, professional reason why this item could be disputed (e.g., "Inaccurate reporting of payment history," "Unrecognized account," "Item is past the statute of limitations.").
-    -   `successProbability`: Your expert estimate of the chance of successful removal, as a percentage from 0 to 100.
+1.  Directly analyze the provided PDF. Parse key metrics.
+2.  Write a concise, encouraging **Summary** of the overall credit profile, highlighting strengths and opportunities.
+3.  Create a **Breakdown by Credit Factor**. For each of the 5 main factors (Payment History, Credit Utilization, Credit Mix, Hard Inquiries, Age of Accounts), provide:
+    -   `title`: The name of the factor.
+    -   `description`: A clear, simple explanation of the user's status for this factor.
+    -   `impact`: A tangible potential score improvement or a clear statement on its effect (e.g., "+20 points if reduced below 30%", "Score impact will decrease over 6-12 months").
+4.  Create a list of concrete, actionable **Action Items** the user can take.
+5.  Identify all negative or potentially incorrect items for the **Disputable Items** list. For each, provide:
+    -   `item`: The name of the account or item.
+    -   `reason`: A clear, professional reason for the dispute.
+    -   `successProbability`: Your expert estimate of the chance of successful removal (0-100).
 
-Your entire output must be in JSON format that strictly adheres to the defined schema. Do not include any text outside of the JSON structure.
+Your entire output must be in JSON format that strictly adheres to the defined schema.
 `;
     const llmResponse = await ai.generate({
         prompt: prompt,
@@ -98,7 +105,7 @@ Your entire output must be in JSON format that strictly adheres to the defined s
             format: 'json',
             schema: AnalyzeCreditProfileOutputSchema,
         },
-        temperature: 0.1
+        temperature: 0.2
     });
 
     const output = llmResponse.output();

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -7,97 +6,85 @@ import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyz
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, FileWarning, ListChecks, ShieldQuestion, BadgePercent } from 'lucide-react';
+import { Loader2, Sparkles, ShieldQuestion, FileHeart, CheckCircle, ArrowUpRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSearchParams } from 'next/navigation';
 
 function AnalysisDisplay({ analysis }: { analysis: AnalyzeCreditProfileOutput }) {
   return (
     <div className="mt-6 space-y-6">
       <Card>
-          <CardHeader>
-              <CardTitle className="font-headline">AI Summary</CardTitle>
-              <CardDescription>A brief overview of your credit profile analysis.</CardDescription>
-          </CardHeader>
-          <CardContent>
-              <p className="text-muted-foreground prose prose-sm max-w-none">{analysis.summary}</p>
-          </CardContent>
-      </Card>
+        <CardHeader>
+          <CardTitle className="font-headline flex items-center gap-2">
+            <FileHeart className="h-6 w-6 text-primary" />
+            Your Credit Analysis
+          </CardTitle>
+          <CardDescription>
+            This AI-powered analysis is based on your uploaded credit report. 
+            Follow these steps to improve your score.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert variant="default">
+            <AlertTitle>Analysis Summary</AlertTitle>
+            <AlertDescription>{analysis.summary}</AlertDescription>
+          </Alert>
 
-      <Card>
-          <CardHeader>
-              <CardTitle className="font-headline flex items-center"><ListChecks className="mr-2 text-primary"/>Action Items</CardTitle>
-              <CardDescription>Personalized steps to improve your credit profile.</CardDescription>
-          </CardHeader>
-           <CardContent>
-              <ul className="list-disc space-y-2 pl-5">
-                  {analysis.actionItems.map((item, idx) => (
-                      <li key={idx} className="text-muted-foreground">{item}</li>
-                  ))}
-              </ul>
-          </CardContent>
-      </Card>
-
-      <Card>
-          <CardHeader>
-              <CardTitle className="font-headline flex items-center"><ShieldQuestion className="mr-2 text-primary"/>Disputable Items</CardTitle>
-              <CardDescription>Items identified as potentially disputable, with success probability.</CardDescription>
-          </CardHeader>
-           <CardContent>
-              {analysis.disputableItems?.length ? (
-                  <Table>
-                      <TableHeader>
-                          <TableRow>
-                              <TableHead>Item</TableHead>
-                              <TableHead>Reason</TableHead>
-                              <TableHead className="text-right">Success Chance</TableHead>
-                          </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                          {analysis.disputableItems.map((item, idx) => (
-                              <TableRow key={idx}>
-                                  <TableCell className="font-medium">{item.item}</TableCell>
-                                  <TableCell>{item.reason}</TableCell>
-                                  <TableCell className="text-right">
-                                      <Badge variant="secondary" className="font-mono"><BadgePercent className="mr-1"/>{item.successProbability}%</Badge>
-                                  </TableCell>
-                              </TableRow>
-                          ))}
-                      </TableBody>
-                  </Table>
-              ) : (
-                  <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
-                      <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No Disputable Items Found</h3>
-                      <p className="text-muted-foreground mb-4">
-                      Our analysis did not find any items recommended for dispute.
-                      </p>
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Score Breakdown by Factor</h3>
+            <div className="space-y-4">
+              {analysis.factors.map((factor, index) => (
+                <div key={index} className="flex flex-col p-4 border rounded-md space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">{factor.title}</span>
+                    <span className="text-green-600 text-sm flex items-center gap-1">
+                      {factor.impact} <ArrowUpRight className="h-4 w-4" />
+                    </span>
                   </div>
-              )}
-          </CardContent>
+                  <p className="text-muted-foreground">{factor.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Your Personalized Action Plan</h3>
+            <div className="space-y-4">
+              {analysis.actionItems.map((item, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600 mt-1 shrink-0" />
+                  <p className="text-muted-foreground">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-primary/10 rounded-md text-primary text-center font-medium">
+            🚀 Unlock the full Pro Analysis to see personalized tradeline strategies, dispute letter templates, and projected score impact for each action item.
+          </div>
+        </CardContent>
       </Card>
 
 
-      <div className="bg-primary/10 p-4 rounded-lg mt-6">
-        <h3 className="text-lg font-bold text-primary mb-2">
-          Ready to take action?
-        </h3>
-        <p className="text-primary/90">
-          You can now generate dispute letters for the negative items found.
-        </p>
-        <Button asChild className="mt-3">
-             <Link href="/letters">
-                Go to Letter Center
-             </Link>
-        </Button>
-      </div>
+      <Card>
+          <CardHeader>
+              <CardTitle className="font-headline flex items-center"><ShieldQuestion className="mr-2 text-primary"/>Ready to take action?</CardTitle>
+              <CardDescription>Use our AI to generate professional dispute letters for the negative items found on your report.</CardDescription>
+          </CardHeader>
+           <CardContent>
+              <Button asChild>
+                <Link href="/letters">
+                    Go to Letter Center <ArrowUpRight className="ml-2"/>
+                </Link>
+              </Button>
+          </CardContent>
+      </Card>
     </div>
   );
 }
@@ -194,13 +181,13 @@ function ReportsPageContent() {
   return (
       <div className="p-6 max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-4 font-headline">Credit Analysis</h1>
-        <p className="mb-4 text-muted-foreground">
-          Upload your credit report for an AI-powered deep analysis of your credit profile, 
-          with exact items to dispute and your personalized action plan.
-        </p>
-
+        
         {!analysisResult && (
           <>
+            <p className="mb-4 text-muted-foreground">
+              Upload your credit report for an AI-powered deep analysis of your credit profile, 
+              with exact items to dispute and your personalized action plan.
+            </p>
             <div className="mb-4 space-y-2">
               <Label htmlFor="reportFile">Upload Report</Label>
               <Input
