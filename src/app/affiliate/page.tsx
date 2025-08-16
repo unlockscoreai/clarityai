@@ -1,52 +1,90 @@
+
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Copy, PlusCircle } from "lucide-react";
+import { Copy, PlusCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "@/context/session-provider";
+import { collection, query, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
+import { useEffect, useState } from "react";
 
-const referrals = [
-    {
-        name: "John Doe",
-        type: "Client",
-        status: "Active",
-        joinDate: "2024-07-01",
-        earnings: "$50.00",
-    },
-    {
-        name: "Jane Smith",
-        type: "Affiliate",
-        status: "Active",
-        joinDate: "2024-06-15",
-        earnings: "$125.50",
-    },
-    {
-        name: "Michael Brown",
-        type: "Client",
-        status: "Pending",
-        joinDate: "2024-07-20",
-        earnings: "$0.00",
-    },
-    {
-        name: "Emily White",
-        type: "Client",
-        status: "Active",
-        joinDate: "2024-05-10",
-        earnings: "$75.00",
-    },
-    {
-        name: "David Green",
-        type: "Affiliate",
-        status: "Inactive",
-        joinDate: "2024-03-22",
-        earnings: "$25.00",
-    },
-];
+type Client = {
+    id: string;
+    name: string;
+    status: string;
+    createdAt: any;
+    earnings?: number;
+    type: "Client";
+};
 
+type Affiliate = {
+    id: string;
+    name: string;
+    status: "Active" | "Inactive";
+    joinDate: any;
+    earnings?: number;
+    type: "Affiliate";
+};
+
+type Referral = Client | Affiliate;
 
 export default function AffiliatePage() {
+    const { user, loading: userLoading } = useSession();
+    const [referrals, setReferrals] = useState<Referral[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+
+        const fetchData = async () => {
+            setLoading(true);
+            const affiliateId = user.uid;
+            
+            try {
+                // Fetch clients
+                const clientsQuery = query(collection(db, "affiliates", affiliateId, "clients"));
+                const clientsSnap = await getDocs(clientsQuery);
+                const clientsData: Client[] = clientsSnap.docs.map(doc => ({
+                    id: doc.id,
+                    type: "Client",
+                    earnings: 0, // Placeholder
+                    ...doc.data(),
+                } as Client));
+                
+                // Fetch referred affiliates (assuming a subcollection)
+                const affiliatesQuery = query(collection(db, "affiliates", affiliateId, "referredAffiliates"));
+                const affiliatesSnap = await getDocs(affiliatesQuery);
+                const affiliatesData: Affiliate[] = affiliatesSnap.docs.map(doc => ({
+                    id: doc.id,
+                    type: "Affiliate",
+                    earnings: 0, // Placeholder
+                    ...doc.data(),
+                } as Affiliate));
+                
+                setReferrals([...clientsData, ...affiliatesData]);
+
+            } catch (error) {
+                console.error("Failed to fetch affiliate data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        
+    }, [user]);
+    
+    const formatDate = (timestamp: any) => {
+        if (!timestamp) return 'N/A';
+        return new Date(timestamp.seconds * 1000).toLocaleDateString();
+    };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -65,8 +103,8 @@ export default function AffiliatePage() {
                 </CardHeader>
                 <CardContent>
                     <div className="flex w-full max-w-lg items-center space-x-2">
-                        <Input type="text" readOnly value="https://creditclarity.ai/ref/YOUR_ID" />
-                        <Button type="submit">
+                        <Input type="text" readOnly value={`https://creditclarity.ai/ref/${user?.uid}`} />
+                        <Button type="button" onClick={() => navigator.clipboard.writeText(`https://creditclarity.ai/ref/${user?.uid}`)}>
                             <Copy className="mr-2 h-4 w-4"/>
                             Copy Link
                         </Button>
@@ -95,7 +133,7 @@ export default function AffiliatePage() {
                     <CardTitle>Total Referrals</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-4xl font-bold">42</p>
+                    <p className="text-4xl font-bold">{referrals.length}</p>
                 </CardContent>
             </Card>
             <Card>
@@ -103,7 +141,7 @@ export default function AffiliatePage() {
                     <CardTitle>Total Earnings</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-4xl font-bold">$1,250.75</p>
+                    <p className="text-4xl font-bold">$0.00</p>
                 </CardContent>
             </Card>
             <Card>
@@ -111,7 +149,7 @@ export default function AffiliatePage() {
                     <CardTitle>Team Credit Volume</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-4xl font-bold">250</p>
+                    <p className="text-4xl font-bold">0</p>
                     <p className="text-sm text-muted-foreground">Next bonus at 500 credits</p>
                 </CardContent>
             </Card>
@@ -119,10 +157,15 @@ export default function AffiliatePage() {
 
         <Card>
             <CardHeader>
-                <CardTitle>Client Management</CardTitle>
+                <CardTitle>Client & Affiliate Management</CardTitle>
                 <CardDescription>A list of your personally referred clients and affiliates.</CardDescription>
             </CardHeader>
             <CardContent>
+                 {loading || userLoading ? (
+                    <div className="flex justify-center items-center h-40">
+                        <Loader2 className="animate-spin text-primary" />
+                    </div>
+                ) : (
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -134,21 +177,26 @@ export default function AffiliatePage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {referrals.map((referral) => (
-                            <TableRow key={referral.name}>
+                        {referrals.length > 0 ? referrals.map((referral) => (
+                            <TableRow key={referral.id}>
                                 <TableCell className="font-medium">{referral.name}</TableCell>
                                 <TableCell>{referral.type}</TableCell>
                                 <TableCell>
-                                    <Badge variant={referral.status === 'Active' ? 'secondary' : 'outline'}>
+                                    <Badge variant={referral.status === 'Active' || referral.status === 'pending_analysis' ? 'secondary' : 'outline'}>
                                         {referral.status}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{referral.joinDate}</TableCell>
-                                <TableCell className="text-right">{referral.earnings}</TableCell>
+                                <TableCell>{formatDate(referral.createdAt || (referral as Affiliate).joinDate)}</TableCell>
+                                <TableCell className="text-right">${(referral.earnings ?? 0).toFixed(2)}</TableCell>
                             </TableRow>
-                        ))}
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center h-24">No referrals yet.</TableCell>
+                            </TableRow>
+                        )}
                     </TableBody>
                 </Table>
+                )}
             </CardContent>
         </Card>
 
@@ -156,3 +204,4 @@ export default function AffiliatePage() {
     </AppLayout>
   );
 }
+
