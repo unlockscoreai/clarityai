@@ -1,48 +1,36 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only read and write to their own document.
     match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
-    }
-    
-    // Users can only read and write to their own reports.
-    match /reports/{userId} {
-       allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth.uid == userId;
     }
 
-    // Letters can only be read or written to by the user who owns them.
-    match /letters/{letterId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    match /reports/{reportId} {
+        allow read, write: if request.auth.uid == resource.data.userId;
     }
 
-    // Transactions can only be read by the user or affiliate who is a party to it.
-     match /transactions/{transactionId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || request.auth.uid == resource.data.affiliateId);
-    }
-    
-    // Affiliates can read their own data, and anyone can create an affiliate record (for signup).
-    // Affiliates can be updated by other affiliates for referral tracking.
     match /affiliates/{affiliateId} {
-      allow read: if request.auth != null && request.auth.uid == affiliateId;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null; // Allows updating own data or referral data by others.
+      allow create;
+      allow read, update: if request.auth.uid == affiliateId;
+      allow update: if request.auth.uid == resource.data.referrerId && "credits" in request.resource.data && "referrals" in request.resource.data;
 
-      // An affiliate can manage their own clients.
       match /clients/{clientId} {
-        allow read, write: if request.auth != null && request.auth.uid == affiliateId;
+        allow read, write: if request.auth.uid == affiliateId;
       }
-
-      // An affiliate can see who they've referred.
+      
       match /referredAffiliates/{referredId} {
-        allow read: if request.auth != null && request.auth.uid == affiliateId;
+        allow read: if request.auth.uid == affiliateId;
       }
+    }
+
+    match /letters/{letterId} {
+      allow read, write: if request.auth.uid == resource.data.userId;
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if request.auth.uid == resource.data.userId;
     }
   }
 }
-
-    

@@ -223,5 +223,3 @@ export default function AffiliateAddClientPage() {
     </AppLayout>
   );
 }
-
-    

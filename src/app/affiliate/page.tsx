@@ -218,5 +218,3 @@ export default function AffiliatePage() {
     </AppLayout>
   );
 }
-
-    
