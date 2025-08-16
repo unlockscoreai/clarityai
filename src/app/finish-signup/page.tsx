@@ -5,11 +5,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { Loader2 } from 'lucide-react';
-import { AppLayout } from '@/components/app-layout';
+import { updateProfile } from 'firebase/auth';
+
 
 export default function FinishSignUpPage() {
   const router = useRouter();
@@ -34,7 +35,7 @@ export default function FinishSignUpPage() {
       }
       
       const analysisJSON = window.localStorage.getItem('analysisResult');
-      const analysis: AnalyzeCreditProfileOutput | null = analysisJSON ? JSON.parse(analysisJSON) : null;
+      const analysis: (AnalyzeCreditProfileOutput & { fullName: string }) | null = analysisJSON ? JSON.parse(analysisJSON) : null;
 
       signInWithEmailLink(auth, email, url)
         .then(async (result) => {
@@ -43,17 +44,23 @@ export default function FinishSignUpPage() {
           
           const user = result.user;
           const userDocRef = doc(db, 'users', user.uid);
-          const isNewUser = !(await db.getDoc(userDocRef)).exists();
+          
+          const userDoc = await getDoc(userDocRef);
+          const isNewUser = !userDoc.exists();
 
           if (isNewUser && analysis) {
             // This is a new user completing the signup flow
             setMessage('Welcome! Setting up your account...');
+            
+            // Update Firebase Auth profile
+            await updateProfile(user, { displayName: analysis.fullName });
+            
             const isTestUser = user.email === 'test@test.com';
             const plan = isTestUser ? 'vip' : 'starter';
             const credits = isTestUser ? 100 : 1;
 
             await setDoc(userDocRef, {
-              fullName: analysis.fullName, // Assuming fullName is on analysis object
+              fullName: analysis.fullName,
               email: user.email,
               subscription: { plan, status: 'active', stripeSessionId: null },
               credits,
@@ -86,7 +93,8 @@ export default function FinishSignUpPage() {
         setMessage('Invalid link. Please try signing in again.');
         router.push('/login');
     }
-  }, [router, toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background">

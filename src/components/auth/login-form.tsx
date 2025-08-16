@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getAuth, sendSignInLinkToEmail } from "firebase/auth";
 
 const actionCodeSettings = {
-  url: `${window.location.origin}/finish-signup`,
+  url: `${typeof window !== 'undefined' ? window.location.origin : ''}/finish-signup`,
   handleCodeInApp: true,
 };
 
