@@ -141,7 +141,7 @@ export default function LettersPage() {
                 reason: `This item is being disputed as per my records. (Item type: ${item.type}, Date: ${item.date})`,
             },
         };
-        const response = await fetch('/api/flows/generateDisputeLetterFlow', {
+        const response = await fetch('/api/flows/generateDisputeLetter', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -315,7 +315,7 @@ export default function LettersPage() {
                               </TableCell>
                             </TableRow>
                           ))}
-                        </TableBody>
+                        </Body>
                       </Table>
                 </CardContent>
             </Card>

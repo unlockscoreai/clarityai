@@ -13,7 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { doc, runTransaction, serverTimestamp, collection, addDoc, increment, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { defineFlow, run } from 'genkit';
+import { run } from 'genkit';
 
 export const GenerateDisputeLetterInputSchema = z.object({
   fullName: z.string().describe('The full name of the person on the report.'),
@@ -21,7 +21,6 @@ export const GenerateDisputeLetterInputSchema = z.object({
   address: z.string().describe('Current address.'),
   creditBureau: z.enum(['Equifax', 'Experian', 'TransUnion']).describe('The credit bureau to send the letter to.'),
   disputedItem: z.object({
-      // We no longer need account number since it's part of the name
       name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"'),
       reason: z.string().describe('The reason for the dispute.'),
   }),
@@ -69,9 +68,13 @@ const disputeLetterPrompt = ai.definePrompt({
 });
 
 
-export const generateDisputeLetterFlow = ai.defineFlow(
+export async function generateDisputeLetter(input: GenerateDisputeLetterInput, context: any): Promise<GenerateDisputeLetterOutput> {
+    return generateAndSaveLetterFlow(input, context);
+}
+
+const generateAndSaveLetterFlow = ai.defineFlow(
   {
-    name: 'generateDisputeLetterFlow',
+    name: 'generateDisputeLetter',
     inputSchema: GenerateDisputeLetterInputSchema,
     outputSchema: GenerateDisputeLetterOutputSchema,
   },
