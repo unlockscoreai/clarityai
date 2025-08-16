@@ -24,9 +24,8 @@ import { useRouter } from "next/navigation";
 import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"; 
+import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore"; 
 import { auth, db } from "@/lib/firebase/client";
-import { AnalyzeCreditReportInput } from "@/ai/flows/credit-report-analyzer";
 
 type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
 
@@ -138,7 +137,8 @@ export function SignupForm() {
 
         // Store report in Firestore
         if (analysis) {
-            await setDoc(doc(db, "reports", user.uid), {
+            const reportsCollectionRef = collection(db, "reports");
+            await addDoc(reportsCollectionRef, {
                 ...analysis,
                 userId: user.uid,
                 fileName: reportFile?.name,
@@ -222,22 +222,22 @@ export function SignupForm() {
                       <div className="space-y-4">
                           <div className="grid grid-cols-2 gap-4 text-center">
                               <div className="bg-background p-3 rounded-lg">
-                                  <p className="text-sm text-muted-foreground">Derogatory Items</p>
-                                  <p className="text-xl font-bold">{analysis.derogatoryCount ?? 0}</p>
+                                  <p className="text-sm text-muted-foreground">Negative Items</p>
+                                  <p className="text-xl font-bold">{analysis.negativeItems?.length ?? 0}</p>
                               </div>
                                <div className="bg-background p-3 rounded-lg">
                                   <p className="text-sm text-muted-foreground">Hard Inquiries</p>
-                                  <p className="text-xl font-bold">{analysis.inquiryCount ?? 0}</p>
+                                  <p className="text-xl font-bold">{analysis.inquiriesFound ?? 0}</p>
                               </div>
                           </div>
                            <div>
                               <h3 className="text-md font-semibold mb-2">Top Items to Challenge:</h3>
-                              {analysis.challengeItems?.length ? (
+                              {analysis.negativeItems?.length ? (
                                 <ul className="space-y-1">
-                                  {analysis.challengeItems.slice(0,2).map((item, idx) => (
+                                  {analysis.negativeItems.slice(0,2).map((item, idx) => (
                                     <li key={idx} className="bg-destructive/10 p-2 rounded-lg flex justify-between items-center text-sm">
-                                      <span className="text-destructive-foreground">{item.name}</span>
-                                      <span className="font-bold text-destructive">{item.successChance}%</span>
+                                      <span className="text-destructive-foreground">{item.account}</span>
+                                      <span className="font-bold text-destructive">{item.type}</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -312,3 +312,5 @@ export function SignupForm() {
     </Card>
   );
 }
+
+    

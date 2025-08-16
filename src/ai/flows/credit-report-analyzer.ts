@@ -23,16 +23,16 @@ export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSc
 
 export const AnalyzeCreditReportOutputSchema = z.object({
   summary: z.string().describe("A brief summary of the credit report's overall health."),
-  creditScore: z.number().describe("The primary credit score found in the report.").default(0),
-  tradelinesFound: z.number().describe("The total number of tradelines (accounts) found.").default(0),
-  inquiriesFound: z.number().describe("The total number of hard inquiries found.").default(0),
+  creditScore: z.number().describe("The primary credit score found in the report."),
+  tradelinesFound: z.number().describe("The total number of tradelines (accounts) found."),
+  inquiriesFound: z.number().describe("The total number of hard inquiries found."),
   negativeItems: z.array(
     z.object({
       type: z.string().describe("The type of negative item (e.g., 'Collection', 'Late Payment')."),
       date: z.string().describe("The date associated with the negative item."),
       account: z.string().describe("The name of the account or creditor associated with the item."),
     })
-  ).describe("A list of negative or derogatory items found in the report.").default([]),
+  ).describe("A list of negative or derogatory items found in the report."),
 });
 export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutputSchema>;
 // #endregion
@@ -74,16 +74,18 @@ const analyzeCreditReportFlow = ai.defineFlow(
 
     if (!output) {
         console.error("AI returned no output.");
-        return AnalyzeCreditReportOutputSchema.parse({});
+        throw new Error("Analysis failed: AI returned no output.");
     }
     
-    // Use Zod safeParse to validate and apply defaults if needed
+    // Use Zod safeParse to validate the output against the schema.
     const result = AnalyzeCreditReportOutputSchema.safeParse(output);
     if (!result.success) {
-      console.warn("Schema validation failed, applying defaults:", result.error.format());
-      return AnalyzeCreditReportOutputSchema.parse({}); // fallback to defaults
+      console.error("Schema validation failed:", result.error.format());
+      throw new Error("Analysis failed: AI returned data in an invalid format.");
     }
 
     return result.data;
   }
 );
+
+    
