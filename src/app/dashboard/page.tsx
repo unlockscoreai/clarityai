@@ -1,3 +1,6 @@
+
+"use client";
+
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,7 +28,103 @@ import {
   BadgeCent,
   FileText,
   Upload,
+  Loader2,
 } from "lucide-react";
+import React, { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useSession } from "@/context/session-provider";
+import { useRouter } from "next/navigation";
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
+import type { AnalyzeCreditProfileOutput } from "@/ai/flows/credit-report-analyzer";
+
+function AnalyzeReportCard() {
+    const [loading, setLoading] = useState(false);
+    const { toast } = useToast();
+    const { user } = useSession();
+    const router = useRouter();
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        if (!user) {
+            toast({ variant: "destructive", title: "Not Authenticated" });
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const idToken = await user.getIdToken();
+            const response = await fetch('/api/flows/analyzeCreditProfileFlow', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${idToken}` },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
+            }
+
+            const result: AnalyzeCreditProfileOutput = await response.json();
+
+            // Save the analysis to Firestore
+            const reportsCollectionRef = collection(db, "reports");
+            await addDoc(reportsCollectionRef, {
+                ...result,
+                userId: user.uid,
+                fileName: file.name,
+                createdAt: serverTimestamp(),
+            });
+
+            toast({ title: 'Analysis Complete' });
+            
+            // Redirect to reports page with analysis data
+            const params = new URLSearchParams();
+            params.set('analysis', JSON.stringify(result));
+            router.push(`/reports?${params.toString()}`);
+
+        } catch (err: any) {
+            console.error(err);
+            toast({
+                variant: 'destructive',
+                title: 'Analysis Failed',
+                description: 'Something went wrong. Please try again.',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    return (
+        <Card className="flex flex-col items-center justify-center text-center p-6 bg-card/50 relative">
+            <label htmlFor="report-upload-dashboard" className="absolute inset-0 cursor-pointer">
+                <span className="sr-only">Upload Report</span>
+            </label>
+            <input id="report-upload-dashboard" type="file" className="hidden" accept=".pdf" onChange={handleFileChange} disabled={loading}/>
+            <CardHeader>
+                <div className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary ${loading ? '' : 'animate-pulse'}`}>
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : <Upload className="h-8 w-8" />}
+                </div>
+                <CardTitle className="font-headline">{loading ? 'Analyzing...' : 'Analyze a New Report'}</CardTitle>
+                <CardDescription>
+                    {loading ? 'Your report is being processed.' : 'Upload your latest credit report PDF to get an updated analysis and find new opportunities.'}
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button asChild tabIndex={-1}>
+                   <label htmlFor="report-upload-dashboard" className="cursor-pointer">
+                    <Upload className="mr-2 h-4 w-4" /> Upload Report
+                   </label>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
 
 export default function DashboardPage() {
   return (
@@ -140,24 +239,7 @@ export default function DashboardPage() {
           </Card>
         </div>
         <div className="grid auto-rows-max items-start gap-4 md:gap-8">
-            <Card className="flex flex-col items-center justify-center text-center p-6 bg-card/50">
-                <CardHeader>
-                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary animate-pulse">
-                        <Upload className="h-8 w-8" />
-                    </div>
-                    <CardTitle className="font-headline">Analyze a New Report</CardTitle>
-                    <CardDescription>
-                        Upload your latest credit report PDF to get an updated analysis and find new opportunities.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button asChild>
-                       <Link href="/reports">
-                        <Upload className="mr-2 h-4 w-4" /> Upload Report
-                       </Link>
-                    </Button>
-                </CardContent>
-            </Card>
+            <AnalyzeReportCard />
         </div>
       </div>
     </AppLayout>
