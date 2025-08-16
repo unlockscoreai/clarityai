@@ -13,12 +13,20 @@ import { useSession } from '@/context/session-provider';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
-function fileToDataURI(file: File): Promise<string> {
+function fileToByteArray(file: File): Promise<number[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
+    reader.onload = (event) => {
+      if (event.target?.result instanceof ArrayBuffer) {
+        const arrayBuffer = event.target.result;
+        const uint8Array = new Uint8Array(arrayBuffer);
+        resolve(Array.from(uint8Array));
+      } else {
+        reject(new Error('Failed to read file as ArrayBuffer.'));
+      }
+    };
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -52,15 +60,20 @@ export default function ReportsPage() {
     setAnalysis(null);
 
     try {
-      const creditReportDataUri = await fileToDataURI(file);
+      const fileData = await fileToByteArray(file);
 
       const input: AnalyzeCreditReportInput = {
-        creditReportDataUri,
+        fileData,
+        fileName: file.name,
       };
 
-      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/flows/analyzeCreditReport', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify(input),
       });
 
@@ -68,7 +81,7 @@ export default function ReportsPage() {
         throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
       }
 
-      const result = await response.json();
+      const result: AnalyzeCreditReportOutput = await response.json();
       setAnalysis(result);
 
       // Save the analysis to Firestore

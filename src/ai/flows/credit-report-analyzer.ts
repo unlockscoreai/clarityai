@@ -11,26 +11,23 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { pdfTextExtractor } from "@/lib/pdfTextExtractor";
+
 
 // #region Input and Output Schemas
-const AnalyzeCreditReportInputSchema = z.object({
-  creditReportDataUri: z
-    .string()
-    .describe(
-      "A credit report PDF, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+export const AnalyzeCreditReportInputSchema = z.object({
+  fileData: z.array(z.number()),
+  fileName: z.string(),
 });
 export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSchema>;
 
-const AnalyzeCreditReportOutputSchema = z.object({
-  summary: z.string().describe("A brief summary of the credit report's overall health."),
+export const AnalyzeCreditReportOutputSchema = z.object({
   derogatoryCount: z.number().describe('The total number of derogatory items found in the report.'),
   openAccounts: z.number().describe('The total number of open accounts.'),
   inquiryCount: z.number().describe('The total number of hard inquiries in the last 12 months.'),
   totalAccounts: z.number().describe('The total number of accounts (open and closed).'),
   challengeItems: z.array(z.object({
-    creditor: z.string().describe('The name of the creditor for the disputed item.'),
-    accountNumber: z.string().describe('The account number of the disputed item (last 4 digits).'),
+    name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"'),
     reason: z.string().describe('A brief reason why this item is being challenged.'),
     successChance: z.number().describe('An estimated success chance percentage for disputing this item (0-100).'),
   })).describe('A list of items recommended for dispute.'),
@@ -39,40 +36,57 @@ const AnalyzeCreditReportOutputSchema = z.object({
 export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutputSchema>;
 // #endregion
 
+/**
+ * Keep prompt as a plain template string. NO backticks or **bold** inside.
+ */
+const SYSTEM_PROMPT = `
+You are an AI credit report analyst.
+
+Goal:
+Return a strictly valid JSON object with summary metrics and recommended dispute targets.
+
+Count metrics using the provided credit report text:
+- derogatoryCount: number of negative items (collections, charge-offs, public records, 30/60/90+ day lates still reporting)
+- openAccounts: number of currently open/active accounts
+- inquiryCount: number of hard inquiries in the last 24 months (if range unclear, count all hard inquiries listed)
+- totalAccounts: total accounts including closed
+
+Build challengeItems:
+For each derogatory or questionable entry, add an item with:
+- name: creditor/collector + last 4 of the account if present
+- reason: concise dispute basis (e.g., "Unverified account", "Incorrect balance/DOFD", "Not mine", "Paid but still reporting")
+- successChance: integer from 0 to 100 estimating removal/correction likelihood
+
+Build actionPlan:
+Create 3–6 clear steps that would measurably improve the score (e.g., paydown amounts to reach <30% utilization, remove authorized user risks, add credit-builder loan, stop new applications, goodwill requests, etc.). Keep each step one sentence.
+
+STRICT OUTPUT FORMAT (must be VALID JSON, no extra text):
+{
+  "derogatoryCount": number,
+  "openAccounts": number,
+  "inquiryCount": number,
+  "totalAccounts": number,
+  "challengeItems": [
+    { "name": string, "reason": string, "successChance": number }
+  ],
+  "actionPlan": [string, ...]
+}
+`;
+
+/**
+ * Helper: try to coerce the model output into JSON if it wraps it with text.
+ */
+function extractJsonBlock(text: string): string {
+  // Try to pull the first {...} block
+  const match = text.match(/\{[\s\S]*\}$/m) || text.match(/\{[\s\S]*\}/m);
+  return match ? match[0] : text;
+}
+
+
 export async function analyzeCreditReport(input: AnalyzeCreditReportInput): Promise<AnalyzeCreditReportOutput> {
   return analyzeCreditReportFlow(input);
 }
 
-const analysisPrompt = ai.definePrompt({
-  name: 'creditAnalysisPrompt',
-  input: {schema: AnalyzeCreditReportInputSchema},
-  output: {schema: AnalyzeCreditReportOutputSchema},
-  prompt: `
-  You are an AI credit report analyzer.
-
-  Instructions:
-
-  1. Summarize: Provide a brief summary of the credit report's overall health.
-  
-  2. Count Metrics:
-     - derogatoryCount: Count all derogatory items (collections, charge-offs, late payments, public records).
-     - openAccounts: Count all currently open accounts.
-     - inquiryCount: Count all hard inquiries (ideally within the last 12-24 months).
-     - totalAccounts: Count all accounts, both open and closed.
-
-  3. Recommended Disputes:
-     - For each derogatory item, generate a dispute recommendation.
-     - Include: creditor name, account number (last 4 digits), reason for dispute, and estimated successChance (0-100).
-
-  4. Create an Action Plan:
-     - Generate an actionPlan with 3-5 clear, prioritized, and actionable steps the user can take to improve their credit.
-
-  Credit Report Document:
-  {{media url=creditReportDataUri}}
-
-  Respond ONLY with valid JSON following the defined output schema.
-  `,
-});
 
 const analyzeCreditReportFlow = ai.defineFlow(
   {
@@ -80,11 +94,36 @@ const analyzeCreditReportFlow = ai.defineFlow(
     inputSchema: AnalyzeCreditReportInputSchema,
     outputSchema: AnalyzeCreditReportOutputSchema,
   },
-  async input => {
-    const { output } = await analysisPrompt(input);
-    if (!output) {
-        throw new Error("Failed to parse the credit report.");
+  async (input) => {
+    // 1) Convert bytes -> text
+    const buffer = Buffer.from(input.fileData);
+    const reportText = await pdfTextExtractor(buffer);
+
+    // 2) Ask the model
+    const prompt = `${SYSTEM_PROMPT}\n\nCREDIT REPORT TEXT:\n${reportText}\n`;
+    const {text} = await ai.generate({
+      prompt,
+      temperature: 0.2,
+    });
+
+    if (!text) {
+        throw new Error("AI did not return a response.");
     }
+
+    // 3) Parse JSON strictly
+    let raw = extractJsonBlock(text);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      throw new Error(
+        "AI returned non-JSON. Check prompt or model settings. Raw:\n" + raw
+      );
+    }
+
+    // 4) Validate against schema (throws if shape is wrong)
+    const output = AnalyzeCreditReportOutputSchema.parse(parsed);
     return output;
   }
 );
