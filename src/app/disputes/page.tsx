@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lock, ArrowRight, Loader2, FileWarning } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/context/session-provider";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useRouter } from "next/navigation";
 import type { AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
@@ -53,12 +53,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 type ChallengeItem = AnalyzeCreditReportOutput["challengeItems"][0];
+type UserPlan = "starter" | "pro" | "vip";
 
 export default function DisputesPage() {
   const { user, loading: userLoading } = useSession();
   const router = useRouter();
   const { toast } = useToast();
-  const [isUpgraded, setIsUpgraded] = useState(false);
+  const [plan, setPlan] = useState<UserPlan>("starter");
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +74,8 @@ export default function DisputesPage() {
     creditBureau: "Equifax" as "Equifax" | "Experian" | "TransUnion",
   });
 
+  const isUpgraded = plan === 'pro' || plan === 'vip';
+
   useEffect(() => {
     if (userLoading) {
         return;
@@ -86,32 +89,32 @@ export default function DisputesPage() {
     const fetchUserData = async () => {
         setLoading(true);
         const userDocRef = doc(db, "users", user.uid);
-        const reportDocRef = doc(db, "reports", user.uid);
-
+        
         try {
-            const [userDocSnap, reportDocSnap] = await Promise.all([
-                getDoc(userDocRef),
-                getDoc(reportDocRef),
-            ]);
-
+            // Fetch user plan and details first
+            const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
                 const userData = userDocSnap.data();
-                setIsUpgraded(userData?.upgraded === true);
+                setPlan(userData?.plan || 'starter');
                 setFormValues(prev => ({ ...prev, address: userData?.address || '' }));
             }
+            
+            // Fetch the latest report
+            const reportQuery = query(
+              collection(db, "reports"),
+              where("userId", "==", user.uid),
+              orderBy("createdAt", "desc"),
+              limit(1)
+            );
+            const reportSnap = await getDocs(reportQuery);
 
-            if (reportDocSnap.exists()) {
-                // Here we can use safeParse to be extra sure, though data from Firestore should be trusted
-                const result = AnalyzeCreditReportOutputSchema.safeParse(reportDocSnap.data());
-                 if (result.success) {
-                    setAnalysis(result.data);
-                } else {
-                    console.warn("Invalid report schema in Firestore:", result.error);
-                    setAnalysis(null);
-                }
+            if (!reportSnap.empty) {
+                const reportData = reportSnap.docs[0].data() as AnalyzeCreditReportOutput;
+                setAnalysis(reportData);
             } else {
                 setAnalysis(null);
             }
+
         } catch (error) {
             console.error("Error fetching user data:", error);
             toast({
@@ -131,19 +134,6 @@ export default function DisputesPage() {
   const handleOpenDialog = (item: ChallengeItem) => {
     setSelectedItem(item);
     setLetterData(null); // Reset previous letter
-    // Prefill form values if we have them
-    if (user) {
-        getDoc(doc(db, "users", user.uid)).then(docSnap => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setFormValues(prev => ({
-                    ...prev,
-                    address: data.address || '',
-                    // dob: data.dob || '', // Assuming dob is stored
-                }));
-            }
-        });
-    }
     setIsLetterDialogOpen(true);
   };
 

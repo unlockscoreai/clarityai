@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,18 +16,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { UploadCloud, FileCheck, Info, CreditCard } from "lucide-react";
+import { UploadCloud, FileCheck, Info, CreditCard, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/context/session-provider";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase/client";
 
 export default function OnboardingPage() {
-  const [credits, setCredits] = useState(0); // Mock credits state. 0 for disabled, >0 for enabled.
+  const [credits, setCredits] = useState(0); 
   const [autoMailer, setAutoMailer] = useState(false);
   const [idFile, setIdFile] = useState<File | null>(null);
   const [mailFile, setMailFile] = useState<File | null>(null);
   const router = useRouter();
+  const { user, loading: userLoading } = useSession();
+  const [loading, setLoading] = useState(true);
 
   const affiliateName = "Jane Doe"; // Mock affiliate name
+
+  useEffect(() => {
+    if (userLoading) return;
+    if (!user) {
+        setLoading(false);
+        return;
+    }
+
+    const fetchUserData = async () => {
+      setLoading(true);
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setCredits(userData.credits || 0);
+      }
+      setLoading(false);
+    };
+
+    fetchUserData();
+  }, [user, userLoading]);
 
   const handleIdUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -51,6 +77,16 @@ export default function OnboardingPage() {
     // Redirect to the disputes page to begin the process.
     router.push('/disputes');
   };
+
+  if (loading || userLoading) {
+      return (
+          <AppLayout>
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          </AppLayout>
+      )
+  }
 
   return (
     <AppLayout>
@@ -162,13 +198,13 @@ export default function OnboardingPage() {
               <CardTitle>3. Automailer Service</CardTitle>
               <CardDescription>
                 Enable our automailer to have your dispute letters printed and
-                shipped automatically.
+                shipped automatically. This costs 1 credit per letter.
               </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="flex items-center space-x-4 rounded-md border p-4">
                     <div className="flex-1 space-y-1">
-                        <p className="text-sm font-medium leading-none">Activate Automailer</p>
+                        <p className="text-sm font-medium leading-none">Activate Automailer (Credits: {credits})</p>
                         <p className="text-sm text-muted-foreground">
                         Automatically mail your dispute letters via certified mail.
                         </p>

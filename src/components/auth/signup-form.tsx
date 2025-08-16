@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore"; 
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"; 
 import { auth, db } from "@/lib/firebase/client";
 import { AnalyzeCreditReportInput } from "@/ai/flows/credit-report-analyzer";
 
@@ -129,16 +129,18 @@ export function SignupForm() {
         await setDoc(doc(db, "users", user.uid), {
             fullName: fullName,
             email: user.email,
-            upgraded: isTestUser, // Set upgraded to true for test user
-            plan: isTestUser ? 'VIP' : null,
-            upgradeDate: isTestUser ? new Date() : null,
+            plan: isTestUser ? 'vip' : 'starter',
+            credits: isTestUser ? 100 : 1,
+            createdAt: serverTimestamp()
         });
 
         // Store report in Firestore
         if (analysis) {
             await setDoc(doc(db, "reports", user.uid), {
                 ...analysis,
-                createdAt: new Date(),
+                userId: user.uid,
+                fileName: reportFile?.name,
+                createdAt: serverTimestamp(),
             });
         }
 
