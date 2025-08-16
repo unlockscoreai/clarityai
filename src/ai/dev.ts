@@ -12,6 +12,5 @@ import { generateDisputeLetter } from '@/ai/flows/dispute-letter-generator';
 import { analyzeCreditReport } from '@/ai/flows/credit-report-analyzer';
 
 export {
-    generateDisputeLetter,
     analyzeCreditReport,
 }
