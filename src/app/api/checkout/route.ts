@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase/client';
 import { coupons } from '@/lib/coupons';
 
 export async function POST(req: Request) {
-  const { plan, credits, coupon, user: authedUser } = await req.json();
+  const { plan, credits, coupon, user: authedUser, affiliateId, clientId } = await req.json();
   const headersList = headers();
   const origin = headersList.get('origin');
 
@@ -83,6 +83,9 @@ export async function POST(req: Request) {
         firebaseUID: session.uid,
         stripeCustomerId: stripeCustomerId,
         plan: planIdentifier,
+        // Add affiliate and client IDs if they exist
+        ...(affiliateId && { affiliateId }),
+        ...(clientId && { clientId }),
       },
     };
     

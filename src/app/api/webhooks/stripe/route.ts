@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import type { Stripe } from 'stripe';
-import { doc, updateDoc, serverTimestamp, increment, runTransaction } from "firebase/firestore";
+import { doc, updateDoc, serverTimestamp, increment, runTransaction, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 
 // Helper to determine credits to add from line items
@@ -56,13 +56,11 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const firebaseUID = session.metadata?.firebaseUID;
-    const stripeCustomerId = session.customer;
-    const plan = session.metadata?.plan;
+    const { firebaseUID, stripeCustomerId, plan, affiliateId, clientId } = session.metadata || {};
 
-    if (!firebaseUID) {
-      console.error("Webhook Error: No firebaseUID in session metadata.");
-      return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
+    if (!firebaseUID && !clientId) {
+      console.error("Webhook Error: No firebaseUID or clientId in session metadata.");
+      return NextResponse.json({ error: 'Missing user or client ID' }, { status: 400 });
     }
 
     try {
@@ -73,13 +71,13 @@ export async function POST(req: NextRequest) {
       const creditsFromCoupon = getCreditsFromCoupon(session);
       const totalCreditsToAdd = creditsFromPurchase + creditsFromCoupon;
       
-      const userDocRef = doc(db, "users", firebaseUID);
-      
       const updateData: { [key: string]: any } = {
-          stripeCustomerId: stripeCustomerId,
           updatedAt: serverTimestamp()
       };
 
+      if (stripeCustomerId) {
+          updateData.stripeCustomerId = stripeCustomerId;
+      }
       if (totalCreditsToAdd > 0) {
         updateData.credits = increment(totalCreditsToAdd);
       }
@@ -90,9 +88,19 @@ export async function POST(req: NextRequest) {
           updateData['subscription.stripeSessionId'] = session.id;
       }
 
-      await updateDoc(userDocRef, updateData);
+      // If affiliateId and clientId are present, update the client record
+      if (affiliateId && clientId) {
+          const clientDocRef = doc(db, "affiliates", affiliateId, "clients", clientId);
+          await setDoc(clientDocRef, updateData, { merge: true });
+          console.log(`Successfully processed checkout for affiliate client: ${clientId}. Total credits added: ${totalCreditsToAdd}`);
 
-      console.log(`Successfully processed checkout for user: ${firebaseUID}. Total credits added: ${totalCreditsToAdd}`);
+      } else if (firebaseUID) {
+          // Otherwise, update the main user record
+          const userDocRef = doc(db, "users", firebaseUID);
+          await updateDoc(userDocRef, updateData);
+          console.log(`Successfully processed checkout for user: ${firebaseUID}. Total credits added: ${totalCreditsToAdd}`);
+      }
+
 
     } catch (dbError: any) {
         console.error('Error updating Firestore from webhook:', dbError);
