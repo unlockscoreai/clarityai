@@ -52,7 +52,10 @@ export default function HomePage() {
                 <LogoIcon className="h-6 w-6 text-primary" />
                 <span className="font-bold text-lg">Credit Clarity AI</span>
             </Link>
-            <nav className="ml-auto flex gap-4 sm:gap-6">
+            <nav className="ml-auto flex gap-4 sm:gap-6 items-center">
+                <Button asChild variant="link">
+                    <Link href="/affiliate/signup">Become an Affiliate</Link>
+                </Button>
                 <Button asChild variant="ghost">
                     <Link href="/login">Log In</Link>
                 </Button>

@@ -1,46 +1,48 @@
 
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Users can only read/write their own data
     match /users/{userId} {
       allow read, update: if request.auth.uid == userId;
-      // Disallow creation/deletion after signup
-      allow create, delete: if false; 
     }
 
-    match /reports/{reportId} {
-      // User can create their own report, and read it.
-      // reportId should be the same as userId for simplicity.
-      allow read, create: if request.auth.uid == reportId && request.auth.uid == request.resource.data.userId;
-      // Reports are immutable
-      allow update, delete: if false;
+    // Users can only read/write their own reports
+    match /reports/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+    
+    // Users can only read/write their own letters
+    match /letters/{letterId} {
+      allow read, write: if request.auth.uid == resource.data.userId;
     }
 
     match /affiliates/{affiliateId} {
-      allow read, write: if request.auth.uid == affiliateId;
-
+      // Allow creation for any new signup
+      allow create: if request.auth.uid == affiliateId;
+      
+      // Allow existing affiliate to read their own data
+      allow read: if request.auth.uid == affiliateId;
+      
+      // Allow an affiliate to be updated by a referrer
+      allow update: if request.auth.uid == affiliateId || 
+                       (request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['referrals', 'credits']) && get(/databases/$(database)/documents/affiliates/$(request.auth.uid)).data.referrals.hasAny(affiliateId));
+      
       match /clients/{clientId} {
+        // Affiliate can manage their own clients
         allow read, write: if request.auth.uid == affiliateId;
       }
 
       match /referredAffiliates/{referredId} {
+        // Affiliate can read their referred affiliates' data
         allow read: if request.auth.uid == affiliateId;
       }
     }
-
-    match /letters/{letterId} {
-        // User must be authenticated to create a letter.
-        // The user ID in the document must match the authenticated user's ID.
-        allow create: if request.auth.uid != null && request.auth.uid == request.resource.data.userId;
-        
-        // Only the user who created the letter can read it.
-        allow read: if request.auth.uid != null && request.auth.uid == resource.data.userId;
-
-        // Letters are immutable once created.
-        allow update, delete: if false;
-    }
-
+    
+    // Transactions are read-only for the affiliate who earned them
     match /transactions/{transactionId} {
       allow read: if request.auth.uid == resource.data.affiliateId;
     }
