@@ -7,12 +7,13 @@ import { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles, FileWarning } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export default function ReportsPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -113,70 +114,73 @@ export default function ReportsPage() {
           onClick={handleAnalyze}
           disabled={!file || loading}
         >
-          {loading ? <><Loader2 className="mr-2 animate-spin" /> Analyzing...</> : 'Analyze Report'}
+          {loading ? <><Loader2 className="mr-2 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2" />Analyze Report</>}
         </Button>
 
-        {error && !analysis && <p className="text-red-500 mt-4">{error}</p>}
+        {error && !analysis && <p className="text-destructive mt-4">{error}</p>}
 
         {analysis && (
           <div className="mt-6 bg-card text-card-foreground p-6 rounded-xl shadow-md space-y-6">
             <h2 className="text-2xl font-bold border-b pb-2 font-headline">Your Credit Analysis</h2>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Derogatory Items</p>
-                <p className="text-2xl font-bold">{analysis.derogatoryCount ?? 0}</p>
+                <p className="text-sm text-muted-foreground">Credit Score</p>
+                <p className="text-2xl font-bold">{analysis.creditScore ?? 'N/A'}</p>
               </div>
               <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Open Accounts</p>
-                <p className="text-2xl font-bold">{analysis.openAccounts ?? 0}</p>
+                <p className="text-sm text-muted-foreground">Tradelines</p>
+                <p className="text-2xl font-bold">{analysis.tradelinesFound ?? 0}</p>
               </div>
               <div className="bg-background p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Hard Inquiries</p>
-                <p className="text-2xl font-bold">{analysis.inquiryCount ?? 0}</p>
-              </div>
-              <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Total Accounts</p>
-                <p className="text-2xl font-bold">{analysis.totalAccounts ?? 0}</p>
+                <p className="text-2xl font-bold">{analysis.inquiriesFound ?? 0}</p>
               </div>
             </div>
 
             <div>
-              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Items to Challenge</h3>
-              {analysis.challengeItems?.length ? (
-                <ul className="space-y-2">
-                  {analysis.challengeItems.map((item, idx) => (
-                    <li
-                      key={idx}
-                      className="bg-destructive/10 p-3 rounded-lg flex justify-between items-center"
-                    >
-                      <span className="text-destructive-foreground">{item.name} – {item.reason}</span>
-                      <span className="font-bold text-destructive">
-                        {item.successChance}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Negative Items Found</h3>
+              {analysis.negativeItems?.length ? (
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Account</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Date</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {analysis.negativeItems.map((item, idx) => (
+                            <TableRow key={idx}>
+                                <TableCell className="font-medium">{item.account}</TableCell>
+                                <TableCell>{item.type}</TableCell>
+                                <TableCell>{item.date}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
               ) : (
-                <p className="text-muted-foreground">No items identified for dispute.</p>
+                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
+                    <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No Negative Items Found</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Our analysis did not find any items recommended for dispute.
+                    </p>
+                 </div>
               )}
             </div>
 
             <div>
-              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Personalized Action Plan</h3>
-              <ul className="list-decimal pl-6 space-y-2 text-muted-foreground">
-                {analysis.actionPlan?.map((step, idx) => (
-                  <li key={idx}>{step}</li>
-                ))}
-              </ul>
+              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">AI Summary</h3>
+              <p className="text-muted-foreground prose prose-sm max-w-none">{analysis.summary}</p>
             </div>
 
             <div className="bg-primary/10 p-4 rounded-lg mt-6">
               <h3 className="text-lg font-bold text-primary mb-2">
-                Unlock Your Full Credit Potential
+                Ready to take action?
               </h3>
               <p className="text-primary/90">
-                You can now generate dispute letters and start improving your score.
+                You can now generate dispute letters for the negative items found.
               </p>
               <Button asChild className="mt-3">
                    <Link href="/letters">

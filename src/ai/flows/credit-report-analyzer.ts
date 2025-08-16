@@ -22,32 +22,25 @@ export const AnalyzeCreditReportInputSchema = z.object({
 export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSchema>;
 
 export const AnalyzeCreditReportOutputSchema = z.object({
-  derogatoryCount: z.number().describe('The total number of derogatory items found in the report.').default(0),
-  openAccounts: z.number().describe('The total number of open accounts.').default(0),
-  inquiryCount: z.number().describe('The total number of hard inquiries in the last 12 months.').default(0),
-  totalAccounts: z.number().describe('The total number of accounts (open and closed).').default(0),
-  challengeItems: z.array(z.object({
-    name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"').default(''),
-    reason: z.string().describe('A brief reason why this item is being challenged.').default(''),
-    successChance: z.number().describe('An estimated success chance percentage for disputing this item (0-100).').default(0),
-  })).describe('A list of items recommended for dispute.').default([]),
-   actionPlan: z.array(z.string()).describe('A personalized, step-by-step action plan for credit improvement.').default([]),
+  summary: z.string().describe("A brief summary of the credit report's overall health."),
+  creditScore: z.number().describe("The primary credit score found in the report.").default(0),
+  tradelinesFound: z.number().describe("The total number of tradelines (accounts) found.").default(0),
+  inquiriesFound: z.number().describe("The total number of hard inquiries found.").default(0),
+  negativeItems: z.array(
+    z.object({
+      type: z.string().describe("The type of negative item (e.g., 'Collection', 'Late Payment')."),
+      date: z.string().describe("The date associated with the negative item."),
+      account: z.string().describe("The name of the account or creditor associated with the item."),
+    })
+  ).describe("A list of negative or derogatory items found in the report.").default([]),
 });
 export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutputSchema>;
 // #endregion
 
 const SYSTEM_PROMPT = `
-You are an AI credit report analyst. Your goal is to analyze the provided credit report text and return a valid JSON object with specific metrics and actionable advice.
-
-Your response MUST be a valid JSON object that conforms to the provided schema. Do not include any text, markdown, or code fences before or after the JSON object.
-
-Based on the credit report text, provide the following:
-- derogatoryCount: Count of all negative items (collections, charge-offs, public records, late payments).
-- openAccounts: Count of all currently open accounts.
-- inquiryCount: Count of all hard inquiries listed.
-- totalAccounts: The total number of accounts, both open and closed.
-- challengeItems: An array of items recommended for dispute. For each, provide the creditor's name, the reason for the dispute (e.g., "Unverified account", "Incorrect balance"), and an estimated success chance (0-100).
-- actionPlan: A list of 3-5 clear, concise, and actionable steps to improve the credit score (e.g., "Pay down credit card X to below 30% utilization.").
+You are a credit report analyzer.
+Extract key structured details from the uploaded credit report.
+Always return valid JSON strictly matching the schema.
 `;
 
 export async function analyzeCreditReport(input: AnalyzeCreditReportInput): Promise<AnalyzeCreditReportOutput> {
@@ -66,15 +59,15 @@ const analyzeCreditReportFlow = ai.defineFlow(
     const reportText = await pdfTextExtractor(buffer);
 
     // 2) Ask the model
-    const prompt = `${SYSTEM_PROMPT}\n\nCREDIT REPORT TEXT:\n${reportText}\n`;
     const llmResponse = await ai.generate({
-      prompt,
-      temperature: 0.2,
+      prompt: `Analyze this credit report (filename: ${input.fileName}). The report text is as follows:\n\n${reportText}`,
       model: 'googleai/gemini-1.5-flash',
       output: {
         format: 'json',
         schema: AnalyzeCreditReportOutputSchema,
       },
+      system: SYSTEM_PROMPT,
+      temperature: 0,
     });
 
     const output = llmResponse.output();

@@ -31,7 +31,7 @@ import { GenerateDisputeLetterInput, GenerateDisputeLetterOutput } from "@/ai/fl
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
-type ChallengeItem = AnalyzeCreditReportOutput["challengeItems"][0];
+type ChallengeItem = AnalyzeCreditReportOutput["negativeItems"][0];
 type UserData = {
   plan: "starter" | "pro" | "vip";
   credits: number;
@@ -126,7 +126,7 @@ export default function LettersPage() {
         return;
     }
 
-    setGeneratingFor(item.name);
+    setGeneratingFor(item.account);
     
     try {
         const idToken = await user.getIdToken();
@@ -137,8 +137,8 @@ export default function LettersPage() {
             // For now, we will generate a letter for each bureau. A real app might let the user choose.
             creditBureau: 'Equifax', // This could be made dynamic
             disputedItem: {
-                name: item.name,
-                reason: item.reason,
+                name: item.account,
+                reason: `This item is being disputed as per my records. (Item type: ${item.type}, Date: ${item.date})`,
             },
         };
         const response = await fetch('/api/flows/generateDisputeLetterFlow', {
@@ -159,7 +159,7 @@ export default function LettersPage() {
         
         toast({
             title: "Letter Generated Successfully!",
-            description: `"${item.name}" dispute letter has been created.`,
+            description: `"${item.account}" dispute letter has been created.`,
         });
 
         // Force a refetch of all data
@@ -202,7 +202,7 @@ export default function LettersPage() {
     );
   }
 
-  const challengeItems = analysis?.challengeItems ?? [];
+  const challengeItems = analysis?.negativeItems ?? [];
   const isGenerated = (itemName: string) => letters.some(l => l.disputedItem.name === itemName);
 
   return (
@@ -231,7 +231,7 @@ export default function LettersPage() {
                 {challengeItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
                     <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Analysis Found</h3>
+                    <h3 className="text-xl font-semibold mb-2">No Negative Items Found</h3>
                     <p className="text-muted-foreground mb-4">
                       You need to analyze a credit report before you can see recommended disputes.
                     </p>
@@ -244,17 +244,17 @@ export default function LettersPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Item to Dispute</TableHead>
-                        <TableHead>Reason</TableHead>
+                        <TableHead>Type</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {challengeItems.map((item, index) => (
                         <TableRow key={index}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
-                          <TableCell className="text-muted-foreground max-w-xs truncate">{item.reason}</TableCell>
+                          <TableCell className="font-medium">{item.account}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-xs truncate">{item.type}</TableCell>
                           <TableCell className="text-right">
-                            {isGenerated(item.name) ? (
+                            {isGenerated(item.account) ? (
                                 <Badge variant="secondary">Generated</Badge>
                             ) : (
                                 <Button 
@@ -262,7 +262,7 @@ export default function LettersPage() {
                                     onClick={() => handleGenerateLetter(item)}
                                     disabled={generatingFor !== null || creditsAvailable < 1}
                                 >
-                                    {generatingFor === item.name ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
+                                    {generatingFor === item.account ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
                                     Generate
                                 </Button>
                             )}
