@@ -65,7 +65,7 @@ const analysisPrompt = ai.definePrompt({
      - Include: creditor name, account number (last 4 digits), reason for dispute, and estimated successChance (0-100).
 
   4. Create an Action Plan:
-     - Generate a actionPlan with 3-5 clear, prioritized, and actionable steps the user can take to improve their credit.
+     - Generate an actionPlan with 3-5 clear, prioritized, and actionable steps the user can take to improve their credit.
 
   Credit Report Document:
   {{media url=creditReportDataUri}}
