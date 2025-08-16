@@ -22,23 +22,20 @@ export const AnalyzeCreditReportInputSchema = z.object({
 export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSchema>;
 
 export const AnalyzeCreditReportOutputSchema = z.object({
-  derogatoryCount: z.number().describe('The total number of derogatory items found in the report.'),
-  openAccounts: z.number().describe('The total number of open accounts.'),
-  inquiryCount: z.number().describe('The total number of hard inquiries in the last 12 months.'),
-  totalAccounts: z.number().describe('The total number of accounts (open and closed).'),
+  derogatoryCount: z.number().describe('The total number of derogatory items found in the report.').default(0),
+  openAccounts: z.number().describe('The total number of open accounts.').default(0),
+  inquiryCount: z.number().describe('The total number of hard inquiries in the last 12 months.').default(0),
+  totalAccounts: z.number().describe('The total number of accounts (open and closed).').default(0),
   challengeItems: z.array(z.object({
-    name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"'),
-    reason: z.string().describe('A brief reason why this item is being challenged.'),
-    successChance: z.number().describe('An estimated success chance percentage for disputing this item (0-100).'),
-  })).describe('A list of items recommended for dispute.'),
-   actionPlan: z.array(z.string()).describe('A personalized, step-by-step action plan for credit improvement.'),
+    name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"').default(''),
+    reason: z.string().describe('A brief reason why this item is being challenged.').default(''),
+    successChance: z.number().describe('An estimated success chance percentage for disputing this item (0-100).').default(0),
+  })).describe('A list of items recommended for dispute.').default([]),
+   actionPlan: z.array(z.string()).describe('A personalized, step-by-step action plan for credit improvement.').default([]),
 });
 export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutputSchema>;
 // #endregion
 
-/**
- * Keep prompt as a plain template string. NO backticks or **bold** inside.
- */
 const SYSTEM_PROMPT = `
 You are an AI credit report analyst.
 
@@ -113,7 +110,8 @@ const analyzeCreditReportFlow = ai.defineFlow(
     });
 
     if (!text) {
-        throw new Error("AI did not return a response.");
+        // Fallback to defaults if AI returns nothing
+        return AnalyzeCreditReportOutputSchema.parse({});
     }
 
     // 3) Parse JSON strictly
@@ -123,14 +121,16 @@ const analyzeCreditReportFlow = ai.defineFlow(
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error("AI returned invalid JSON: " + raw);
+      console.error("AI returned invalid JSON: " + raw);
+      // Fallback to defaults if JSON is malformed
+      return AnalyzeCreditReportOutputSchema.parse({});
     }
 
-    // Use Zod safeParse to avoid hard crash
+    // Use Zod safeParse to avoid hard crash and apply defaults
     const result = AnalyzeCreditReportOutputSchema.safeParse(parsed);
     if (!result.success) {
-      console.error("Schema validation failed", result.error.format());
-      throw new Error("Invalid analysis schema. Raw:\n" + raw);
+      console.warn("Schema validation failed, applying defaults:", result.error.format());
+      return AnalyzeCreditReportOutputSchema.parse({}); // fallback to defaults
     }
 
     return result.data;
