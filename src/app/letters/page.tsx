@@ -27,8 +27,9 @@ import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from "
 import { db } from "@/lib/firebase/client";
 import { useRouter } from "next/navigation";
 import type { AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
-import { GenerateDisputeLetterInput, GenerateDisputeLetterOutput } from "@/ai/flows/dispute-letter-generator";
+import { GenerateDisputeLetterInput } from "@/ai/flows/dispute-letter-generator";
 import { useToast } from "@/hooks/use-toast";
+import { useGenerateDisputeLetter } from "@/hooks/useGenerateDisputeLetter";
 import { Badge } from "@/components/ui/badge";
 
 type ChallengeItem = AnalyzeCreditReportOutput["negativeItems"][0];
@@ -56,12 +57,14 @@ export default function LettersPage() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
   const [letters, setLetters] = useState<LetterRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [activeGenerationItem, setActiveGenerationItem] = useState<string | null>(null);
+
+  const { generateLetter, loading: generationLoading } = useGenerateDisputeLetter();
 
   const fetchUserDataAndReport = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    setPageLoading(true);
     try {
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnap = await getDoc(userDocRef);
@@ -93,14 +96,14 @@ export default function LettersPage() {
             description: "Could not load your dispute data.",
         });
     } finally {
-        setLoading(false);
+        setPageLoading(false);
     }
   }, [user, toast]);
 
   useEffect(() => {
     if (userLoading) return;
     if (!user) {
-      setLoading(false);
+      setPageLoading(false);
       return;
     }
     fetchUserDataAndReport();
@@ -125,56 +128,29 @@ export default function LettersPage() {
         toast({ variant: "destructive", title: "No Credits", description: "You need at least 1 credit to generate a letter."});
         return;
     }
-
-    setGeneratingFor(item.account);
     
-    try {
-        const idToken = await user.getIdToken();
-        const input: GenerateDisputeLetterInput = {
-            fullName: user.displayName || userData.fullName,
-            dob: userData.dob,
-            address: userData.address,
-            // For now, we will generate a letter for each bureau. A real app might let the user choose.
-            creditBureau: 'Equifax', // This could be made dynamic
-            disputedItem: {
-                name: item.account,
-                reason: `This item is being disputed as per my records. (Item type: ${item.type}, Date: ${item.date})`,
-            },
-        };
-        const response = await fetch('/api/dispute/generate', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${idToken}`,
-            },
-            body: JSON.stringify(input),
-        });
+    setActiveGenerationItem(item.account);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Failed to generate letter.`);
-        }
-        
-        const result: GenerateDisputeLetterOutput = await response.json();
-        
-        toast({
-            title: "Letter Generated Successfully!",
-            description: `"${item.account}" dispute letter has been created.`,
-        });
-
-        // Force a refetch of all data
-        await fetchUserDataAndReport();
-
-    } catch (error: any) {
-        console.error("Failed to generate letter", error);
-        toast({
-            variant: "destructive",
-            title: "Generation Failed",
-            description: error.message || "There was an error generating your letter. Please try again.",
-        });
-    } finally {
-        setGeneratingFor(null);
+    const input: GenerateDisputeLetterInput = {
+        fullName: user.displayName || userData.fullName,
+        dob: userData.dob,
+        address: userData.address,
+        creditBureau: 'Equifax',
+        disputedItem: {
+            name: item.account,
+            reason: `This item is being disputed as per my records. (Item type: ${item.type}, Date: ${item.date})`,
+        },
+    };
+    
+    const idToken = await user.getIdToken();
+    const result = await generateLetter(input, idToken);
+    
+    if (result) {
+      // On success, refetch all data to update the UI
+      await fetchUserDataAndReport();
     }
+    
+    setActiveGenerationItem(null);
   };
 
   const downloadLetter = (content: string, name: string) => {
@@ -189,7 +165,7 @@ export default function LettersPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (loading || userLoading) {
+  if (pageLoading || userLoading) {
     return (
       <AppLayout>
         <div className="flex justify-center items-center h-full">
@@ -260,9 +236,9 @@ export default function LettersPage() {
                                 <Button 
                                     size="sm"
                                     onClick={() => handleGenerateLetter(item)}
-                                    disabled={generatingFor !== null || creditsAvailable < 1}
+                                    disabled={generationLoading || creditsAvailable < 1}
                                 >
-                                    {generatingFor === item.account ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
+                                    {generationLoading && activeGenerationItem === item.account ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
                                     Generate
                                 </Button>
                             )}
