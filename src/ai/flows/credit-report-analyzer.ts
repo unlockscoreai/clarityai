@@ -23,16 +23,18 @@ const AnalyzeCreditReportInputSchema = z.object({
 export type AnalyzeCreditReportInput = z.infer<typeof AnalyzeCreditReportInputSchema>;
 
 const AnalyzeCreditReportOutputSchema = z.object({
+  summary: z.string().describe("A brief summary of the credit report's overall health."),
   derogatoryCount: z.number().describe('The total number of derogatory items found in the report.'),
   openAccounts: z.number().describe('The total number of open accounts.'),
   inquiryCount: z.number().describe('The total number of hard inquiries in the last 12 months.'),
   totalAccounts: z.number().describe('The total number of accounts (open and closed).'),
   challengeItems: z.array(z.object({
-    name: z.string().describe('The name of the item to challenge (e.g., creditor name and partial account number).'),
+    creditor: z.string().describe('The name of the creditor for the disputed item.'),
+    accountNumber: z.string().describe('The account number of the disputed item (last 4 digits).'),
     reason: z.string().describe('A brief reason why this item is being challenged.'),
-    successChance: z.number().describe('An estimated success chance percentage for disputing this item.'),
+    successChance: z.number().describe('An estimated success chance percentage for disputing this item (0-100).'),
   })).describe('A list of items recommended for dispute.'),
-  actionPlan: z.array(z.string()).describe('A personalized, step-by-step action plan for credit improvement.'),
+   actionPlan: z.array(z.string()).describe('A personalized, step-by-step action plan for credit improvement.'),
 });
 export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutputSchema>;
 // #endregion
@@ -46,29 +48,29 @@ const analysisPrompt = ai.definePrompt({
   input: {schema: AnalyzeCreditReportInputSchema},
   output: {schema: AnalyzeCreditReportOutputSchema},
   prompt: `
-  You are an expert credit analyst. Analyze the provided credit report and extract the specified information into the required JSON format.
+  You are an AI credit report analyzer.
+
+  Instructions:
+
+  1. Summarize: Provide a brief summary of the credit report's overall health.
+  
+  2. Count Metrics:
+     - derogatoryCount: Count all derogatory items (collections, charge-offs, late payments, public records).
+     - openAccounts: Count all currently open accounts.
+     - inquiryCount: Count all hard inquiries (ideally within the last 12-24 months).
+     - totalAccounts: Count all accounts, both open and closed.
+
+  3. Recommended Disputes:
+     - For each derogatory item, generate a dispute recommendation.
+     - Include: creditor name, account number (last 4 digits), reason for dispute, and estimated successChance (0-100).
+
+  4. Create an Action Plan:
+     - Generate a actionPlan with 3-5 clear, prioritized, and actionable steps the user can take to improve their credit.
 
   Credit Report Document:
   {{media url=creditReportDataUri}}
 
-  **Instructions:**
-  1.  **Count Metrics:**
-      *   derogatoryCount: Count all derogatory items (e.g., collections, charge-offs, late payments, public records).
-      *   openAccounts: Count all currently open accounts.
-      *   inquiryCount: Count all hard inquiries, ideally within the last 12-24 months.
-      *   totalAccounts: Count all accounts, both open and closed.
-
-  2.  **Identify Challengeable Items:**
-      *   Create a list of challengeItems.
-      *   For each item, provide a name (e.g., "ABC Collections - Acct #...1234"), a concise reason for the dispute (e.g., "Balance mismatch", "Unrecognized account"), and estimate a successChance as a percentage (e.g., 75).
-      *   Prioritize items that are factually incorrect, old, or from third-party collectors.
-
-  3.  **Create an Action Plan:**
-      *   Generate a actionPlan with 3-5 clear, prioritized, and actionable steps the user can take to improve their credit.
-      *   The first steps should focus on the identified challengeItems.
-      *   Subsequent steps can include general advice like paying down high-utilization cards or avoiding new credit.
-
-  Provide only the JSON output conforming to the schema.
+  Respond ONLY with valid JSON following the defined output schema.
   `,
 });
 
@@ -86,4 +88,3 @@ const analyzeCreditReportFlow = ai.defineFlow(
     return output;
   }
 );
-
