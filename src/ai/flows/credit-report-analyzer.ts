@@ -11,7 +11,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { pdfTextExtractor } from "@/lib/pdfTextExtractor";
+import pdf from 'pdf-parse';
 
 
 // #region Input and Output Schemas
@@ -56,7 +56,8 @@ const analyzeCreditReportFlow = ai.defineFlow(
   async (input) => {
     // 1) Convert bytes -> text
     const buffer = Buffer.from(input.fileData);
-    const reportText = await pdfTextExtractor(buffer);
+    const pdfData = await pdf(buffer);
+    const reportText = pdfData.text;
 
     // 2) Ask the model
     const llmResponse = await ai.generate({
@@ -87,5 +88,3 @@ const analyzeCreditReportFlow = ai.defineFlow(
     return result.data;
   }
 );
-
-    
