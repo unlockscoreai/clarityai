@@ -4,12 +4,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendEmailVerification } from 'firebase/auth';
+import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { Loader2 } from 'lucide-react';
-import { updateProfile } from 'firebase/auth';
 
 
 export default function FinishSignUpPage() {
