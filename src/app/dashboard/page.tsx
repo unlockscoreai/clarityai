@@ -59,11 +59,15 @@ function AnalyzeReportCard() {
         setLoading(true);
 
         try {
+            const idToken = await user.getIdToken();
             const formData = new FormData();
             formData.append('file', file);
 
             const response = await fetch('/api/analyze', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                },
                 body: formData,
             });
 

@@ -7,10 +7,10 @@ import { z } from 'genkit';
 import { ai } from '@/ai/genkit';
 
 const AnalyzeCreditProfileInputSchema = z.object({
-  creditReportDataUri: z
+  creditReportGsUri: z
     .string()
     .describe(
-      "A credit report file as a data URI that must include a MIME type and use Base64 encoding. Format: 'data:<mimetype>;base64,<encoded_data>'."
+      "The Google Cloud Storage URI of the credit report file. Format: 'gs://<bucket_name>/<path_to_file>'."
     ),
 });
 export type AnalyzeCreditProfileInput = z.infer<typeof AnalyzeCreditProfileInputSchema>;
@@ -74,7 +74,7 @@ ${checklist}
 
 Analyze this credit report:
 ---
-{{media url=creditReportDataUri}}
+{{media url=creditReportGsUri}}
 ---
 
 Instructions:

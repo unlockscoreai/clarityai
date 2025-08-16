@@ -1,19 +1,15 @@
 
-import { initializeApp, getApp, getApps, App } from 'firebase-admin/app';
+import { initializeApp, getApp, getApps, App, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { credential } from 'firebase-admin';
 
 let app: App;
 
 if (getApps().length === 0) {
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
-  }
-  
   app = initializeApp({
-    credential: credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)),
+    credential: applicationDefault(),
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
-
 } else {
   app = getApp();
 }

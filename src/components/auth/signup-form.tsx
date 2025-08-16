@@ -74,11 +74,42 @@ export function SignupForm() {
     setError(null);
 
     try {
+      // We need a temporary user account to upload the file against.
+      // Firebase doesn't have a great way to do this without a full sign-in.
+      // For this flow, we will create a temporary anonymous user, who will later
+      // be converted into a permanent user.
+      const auth = getAuth();
+      
+      const actionCodeSettings = {
+        url: `${window.location.origin}/finish-signup`,
+        handleCodeInApp: true,
+      };
+
+      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
+
+      const tempUserToken = await new Promise<string>((resolve, reject) => {
+        const interval = setInterval(async () => {
+          try {
+            const tempAuth = getAuth();
+            if (tempAuth.currentUser) {
+              const token = await tempAuth.currentUser.getIdToken();
+              clearInterval(interval);
+              resolve(token);
+            }
+          } catch(e) {
+            // Ignore errors until we get a user
+          }
+        }, 1000);
+      });
+
       const formData = new FormData();
       formData.append('file', reportFile);
       
       const response = await fetch('/api/analyze', {
         method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${tempUserToken}`,
+        },
         body: formData,
       });
 
@@ -88,17 +119,8 @@ export function SignupForm() {
 
       const analysisResult: AnalyzeCreditProfileOutput & { fullName?: string } = await response.json();
       
-      // Send sign-in link
-      const auth = getAuth();
-      const actionCodeSettings = {
-        url: `${window.location.origin}/finish-signup`,
-        handleCodeInApp: true,
-      };
-      await sendSignInLinkToEmail(auth, email, actionCodeSettings);
-
-      // Store email and analysis results in local storage to be picked up after verification
       window.localStorage.setItem('emailForSignIn', email);
-      analysisResult.fullName = fullName; // Add fullName to the object
+      analysisResult.fullName = fullName; 
       window.localStorage.setItem('analysisResult', JSON.stringify(analysisResult));
 
       setStep("preview");

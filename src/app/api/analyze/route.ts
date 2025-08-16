@@ -1,13 +1,22 @@
+
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
+import { getStorage } from 'firebase-admin/storage';
+import { auth as adminAuth } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const contentType = req.headers.get('content-type');
+    const token = req.headers.get('authorization')?.split('Bearer ')[1];
+    if (!token) {
+        return NextResponse.json({ error: 'Unauthorized: No token provided' }, { status: 401 });
+    }
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    const userId = decodedToken.uid;
 
+    const contentType = req.headers.get('content-type');
     if (!contentType?.includes('multipart/form-data')) {
       return NextResponse.json({ error: 'Invalid content type. Must be multipart/form-data.' }, { status: 400 });
     }
@@ -19,13 +28,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     }
 
-    // Convert file to data URI
+    // Upload file to Firebase Storage
+    const storage = getStorage();
+    const bucket = storage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
+    const filePath = `reports/${userId}/${Date.now()}-${file.name}`;
+    const fileRef = bucket.file(filePath);
+    
     const fileBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(fileBuffer).toString('base64');
-    const dataUri = `data:${file.type};base64,${base64}`;
+    await fileRef.save(Buffer.from(fileBuffer), {
+        contentType: file.type
+    });
+
+    const gsUri = `gs://${bucket.name}/${filePath}`;
 
     const input = {
-      creditReportDataUri: dataUri,
+      creditReportGsUri: gsUri,
     };
 
     const response = await analyzeCreditProfile(input);
@@ -37,6 +54,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid input.', details: err.format() }, { status: 400 });
     }
     
+    if (err.code === 'auth/id-token-expired' || err.code === 'auth/argument-error') {
+         return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+    }
+
     console.error('[API/ANALYZE] Flow execution error:', err);
     return NextResponse.json({ error: err.message || 'Flow execution failed' }, { status: 500 });
   }
