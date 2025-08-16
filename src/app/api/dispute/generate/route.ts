@@ -2,7 +2,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateDisputeLetter, GenerateDisputeLetterInputSchema } from '@/ai/flows/dispute-letter-generator';
+import { generateCreditDisputeLetter, GenerateCreditDisputeLetterInputSchema } from '@/ai/flows/dispute-letter-generator';
 import { auth } from '@/lib/firebase/server';
 import { z } from 'zod';
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     // 2. Validate input
-    const input = GenerateDisputeLetterInputSchema.parse(body);
+    const input = GenerateCreditDisputeLetterInputSchema.parse(body);
 
     // 3. Get authenticated user
     const authUser = await getAuthUser(req);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Call dispute letter generator with auth context
-    const result = await generateDisputeLetter(input, { auth: authUser });
+    const result = await generateCreditDisputeLetter(input, { auth: authUser });
 
     // 5. Return result
     return NextResponse.json(result, { status: 200 });

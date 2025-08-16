@@ -8,10 +8,10 @@ import module from 'node:module';
 const require = module.createRequire(import.meta.url);
 require('tsconfig-paths/register');
 
-import { generateDisputeLetter } from '@/ai/flows/dispute-letter-generator';
+import { generateCreditDisputeLetter } from '@/ai/flows/dispute-letter-generator';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
 
 export {
     analyzeCreditProfile,
-    generateDisputeLetter,
+    generateCreditDisputeLetter,
 }
