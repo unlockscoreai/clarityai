@@ -38,7 +38,7 @@ import { auth } from "@/lib/firebase/client";
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/reports", icon: FileText, label: "Reports" },
-  { href: "/disputes", icon: GanttChartSquare, label: "Disputes" },
+  { href: "/letters", icon: GanttChartSquare, label: "Letters" },
   { href: "/credits", icon: CreditCard, label: "Credits" },
   { href: "/affiliate", icon: Handshake, label: "Affiliate" },
 ];

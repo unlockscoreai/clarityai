@@ -74,8 +74,8 @@ export default function OnboardingPage() {
     // In a real app, you would make an API call to your backend to handle the files and data.
     // If automailer is enabled, you would trigger the doupost service.
     
-    // Redirect to the disputes page to begin the process.
-    router.push('/disputes');
+    // Redirect to the letters page to begin the process.
+    router.push('/letters');
   };
 
   if (loading || userLoading) {
