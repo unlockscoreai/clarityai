@@ -20,19 +20,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { FileText, ArrowRight, Loader2, FileWarning, Info, BadgeAlert, Sparkles, Download } from "lucide-react";
+import { ArrowRight, Loader2, FileWarning, BadgeAlert, Sparkles, Download, ShieldQuestion, BadgePercent } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/context/session-provider";
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useRouter } from "next/navigation";
-import type { AnalyzeCreditReportOutput } from "@/ai/flows/credit-report-analyzer";
+import type { AnalyzeCreditProfileOutput } from "@/ai/flows/credit-report-analyzer";
 import { GenerateDisputeLetterInput } from "@/ai/flows/dispute-letter-generator";
 import { useToast } from "@/hooks/use-toast";
 import { useGenerateDisputeLetter } from "@/hooks/useGenerateDisputeLetter";
 import { Badge } from "@/components/ui/badge";
 
-type ChallengeItem = AnalyzeCreditReportOutput["negativeItems"][0];
+type ChallengeItem = AnalyzeCreditProfileOutput["disputableItems"][0];
 type UserData = {
   plan: "starter" | "pro" | "vip";
   credits: number;
@@ -55,7 +55,7 @@ export default function LettersPage() {
   const { toast } = useToast();
   
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeCreditProfileOutput | null>(null);
   const [letters, setLetters] = useState<LetterRecord[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [activeGenerationItem, setActiveGenerationItem] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export default function LettersPage() {
         const reportSnap = await getDocs(reportQuery);
 
         if (!reportSnap.empty) {
-            setAnalysis(reportSnap.docs[0].data() as AnalyzeCreditReportOutput);
+            setAnalysis(reportSnap.docs[0].data() as AnalyzeCreditProfileOutput);
         }
         
         const lettersQuery = query(collection(db, "letters"), where("userId", "==", user.uid));
@@ -129,7 +129,7 @@ export default function LettersPage() {
         return;
     }
     
-    setActiveGenerationItem(item.account);
+    setActiveGenerationItem(item.item);
 
     const input: GenerateDisputeLetterInput = {
         fullName: user.displayName || userData.fullName,
@@ -137,8 +137,8 @@ export default function LettersPage() {
         address: userData.address,
         creditBureau: 'Equifax',
         disputedItem: {
-            name: item.account,
-            reason: `This item is being disputed as per my records. (Item type: ${item.type}, Date: ${item.date})`,
+            name: item.item,
+            reason: item.reason,
         },
     };
     
@@ -178,7 +178,7 @@ export default function LettersPage() {
     );
   }
 
-  const challengeItems = analysis?.negativeItems ?? [];
+  const challengeItems = analysis?.disputableItems ?? [];
   const isGenerated = (itemName: string) => letters.some(l => l.disputedItem.name === itemName);
 
   return (
@@ -194,7 +194,7 @@ export default function LettersPage() {
         <Card>
             <CardHeader>
                 <div className="flex justify-between items-center">
-                    <CardTitle>Dispute Generation</CardTitle>
+                    <CardTitle className="flex items-center"><ShieldQuestion className="mr-2"/>Dispute Generation</CardTitle>
                     <Badge variant="outline" className="text-lg py-1 px-4">
                         Credits: <span className="font-bold ml-2">{creditsAvailable}</span>
                     </Badge>
@@ -207,7 +207,7 @@ export default function LettersPage() {
                 {challengeItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
                     <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Negative Items Found</h3>
+                    <h3 className="text-xl font-semibold mb-2">No Disputable Items Found</h3>
                     <p className="text-muted-foreground mb-4">
                       You need to analyze a credit report before you can see recommended disputes.
                     </p>
@@ -220,17 +220,21 @@ export default function LettersPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Item to Dispute</TableHead>
-                        <TableHead>Type</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Success Chance</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {challengeItems.map((item, index) => (
                         <TableRow key={index}>
-                          <TableCell className="font-medium">{item.account}</TableCell>
-                          <TableCell className="text-muted-foreground max-w-xs truncate">{item.type}</TableCell>
+                          <TableCell className="font-medium">{item.item}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-xs truncate">{item.reason}</TableCell>
+                           <TableCell>
+                                <Badge variant="secondary" className="font-mono"><BadgePercent className="mr-1"/>{item.successProbability}%</Badge>
+                           </TableCell>
                           <TableCell className="text-right">
-                            {isGenerated(item.account) ? (
+                            {isGenerated(item.item) ? (
                                 <Badge variant="secondary">Generated</Badge>
                             ) : (
                                 <Button 
@@ -238,7 +242,7 @@ export default function LettersPage() {
                                     onClick={() => handleGenerateLetter(item)}
                                     disabled={generationLoading || creditsAvailable < 1}
                                 >
-                                    {generationLoading && activeGenerationItem === item.account ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
+                                    {generationLoading && activeGenerationItem === item.item ? <Loader2 className="animate-spin" /> : <Sparkles className="mr-2" />}
                                     Generate
                                 </Button>
                             )}

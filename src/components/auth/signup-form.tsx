@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, collection, addDoc } from "firebase/firestore"; 
@@ -35,7 +35,7 @@ export function SignupForm() {
 
   const [step, setStep] = useState<SignupStep>("upload");
   const [reportFile, setReportFile] = useState<File | null>(null);
-  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeCreditProfileOutput | null>(null);
   
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -83,7 +83,7 @@ export function SignupForm() {
       const formData = new FormData();
       formData.append('file', reportFile);
       
-      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+      const response = await fetch('/api/flows/analyzeCreditProfileFlow', {
         method: 'POST',
         body: formData,
       });
@@ -92,7 +92,7 @@ export function SignupForm() {
         throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
       }
 
-      const analysisResult: AnalyzeCreditReportOutput = await response.json();
+      const analysisResult: AnalyzeCreditProfileOutput = await response.json();
       setAnalysis(analysisResult);
       setStep("preview");
 
@@ -220,24 +220,18 @@ export function SignupForm() {
                 <CardContent className="space-y-4">
                     {analysis && (
                       <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4 text-center">
-                              <div className="bg-background p-3 rounded-lg">
-                                  <p className="text-sm text-muted-foreground">Negative Items</p>
-                                  <p className="text-xl font-bold">{analysis.negativeItems?.length ?? 0}</p>
-                              </div>
-                               <div className="bg-background p-3 rounded-lg">
-                                  <p className="text-sm text-muted-foreground">Hard Inquiries</p>
-                                  <p className="text-xl font-bold">{analysis.inquiriesFound ?? 0}</p>
-                              </div>
-                          </div>
+                           <div className="bg-background p-3 rounded-lg text-center">
+                               <p className="text-sm text-muted-foreground">Disputable Items Found</p>
+                               <p className="text-xl font-bold">{analysis.disputableItems?.length ?? 0}</p>
+                           </div>
                            <div>
                               <h3 className="text-md font-semibold mb-2">Top Items to Challenge:</h3>
-                              {analysis.negativeItems?.length ? (
+                              {analysis.disputableItems?.length ? (
                                 <ul className="space-y-1">
-                                  {analysis.negativeItems.slice(0,2).map((item, idx) => (
+                                  {analysis.disputableItems.slice(0,2).map((item, idx) => (
                                     <li key={idx} className="bg-destructive/10 p-2 rounded-lg flex justify-between items-center text-sm">
-                                      <span className="text-destructive-foreground">{item.account}</span>
-                                      <span className="font-bold text-destructive">{item.type}</span>
+                                      <span className="text-destructive-foreground truncate max-w-[200px]">{item.item}</span>
+                                      <span className="font-bold text-destructive">{item.successProbability}% chance</span>
                                     </li>
                                   ))}
                                 </ul>
@@ -312,5 +306,3 @@ export function SignupForm() {
     </Card>
   );
 }
-
-    

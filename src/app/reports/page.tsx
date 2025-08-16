@@ -3,22 +3,24 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { AnalyzeCreditReportOutput } from '@/ai/flows/credit-report-analyzer';
+import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, FileWarning } from 'lucide-react';
+import { Loader2, Sparkles, FileWarning, ListChecks, ShieldQuestion, BadgePercent } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default function ReportsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalyzeCreditReportOutput | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeCreditProfileOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useSession();
@@ -49,7 +51,7 @@ export default function ReportsPage() {
       formData.append('file', file);
       
       const idToken = await user.getIdToken();
-      const response = await fetch('/api/flows/analyzeCreditReportFlow', {
+      const response = await fetch('/api/flows/analyzeCreditProfileFlow', {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${idToken}`,
@@ -61,7 +63,7 @@ export default function ReportsPage() {
         throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
       }
 
-      const result: AnalyzeCreditReportOutput = await response.json();
+      const result: AnalyzeCreditProfileOutput = await response.json();
       setAnalysis(result);
 
       // Save the analysis to Firestore
@@ -120,60 +122,70 @@ export default function ReportsPage() {
         {error && !analysis && <p className="text-destructive mt-4">{error}</p>}
 
         {analysis && (
-          <div className="mt-6 bg-card text-card-foreground p-6 rounded-xl shadow-md space-y-6">
-            <h2 className="text-2xl font-bold border-b pb-2 font-headline">Your Credit Analysis</h2>
+          <div className="mt-6 space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">AI Summary</CardTitle>
+                    <CardDescription>A brief overview of your credit profile analysis.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-muted-foreground prose prose-sm max-w-none">{analysis.summary}</p>
+                </CardContent>
+            </Card>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Credit Score</p>
-                <p className="text-2xl font-bold">{analysis.creditScore ?? 'N/A'}</p>
-              </div>
-              <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Tradelines</p>
-                <p className="text-2xl font-bold">{analysis.tradelinesFound ?? 0}</p>
-              </div>
-              <div className="bg-background p-4 rounded-lg">
-                <p className="text-sm text-muted-foreground">Hard Inquiries</p>
-                <p className="text-2xl font-bold">{analysis.inquiriesFound ?? 0}</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">Negative Items Found</h3>
-              {analysis.negativeItems?.length ? (
-                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Account</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Date</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {analysis.negativeItems.map((item, idx) => (
-                            <TableRow key={idx}>
-                                <TableCell className="font-medium">{item.account}</TableCell>
-                                <TableCell>{item.type}</TableCell>
-                                <TableCell>{item.date}</TableCell>
-                            </TableRow>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center"><ListChecks className="mr-2 text-primary"/>Action Items</CardTitle>
+                    <CardDescription>Personalized steps to improve your credit profile.</CardDescription>
+                </CardHeader>
+                 <CardContent>
+                    <ul className="list-disc space-y-2 pl-5">
+                        {analysis.actionItems.map((item, idx) => (
+                            <li key={idx} className="text-muted-foreground">{item}</li>
                         ))}
-                    </TableBody>
-                </Table>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
-                    <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No Negative Items Found</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Our analysis did not find any items recommended for dispute.
-                    </p>
-                 </div>
-              )}
-            </div>
+                    </ul>
+                </CardContent>
+            </Card>
 
-            <div>
-              <h3 className="text-xl font-semibold mt-6 mb-3 font-headline">AI Summary</h3>
-              <p className="text-muted-foreground prose prose-sm max-w-none">{analysis.summary}</p>
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center"><ShieldQuestion className="mr-2 text-primary"/>Disputable Items</CardTitle>
+                    <CardDescription>Items identified as potentially disputable, with success probability.</CardDescription>
+                </CardHeader>
+                 <CardContent>
+                    {analysis.disputableItems?.length ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Reason</TableHead>
+                                    <TableHead className="text-right">Success Chance</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analysis.disputableItems.map((item, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell className="font-medium">{item.item}</TableCell>
+                                        <TableCell>{item.reason}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Badge variant="secondary" className="font-mono"><BadgePercent className="mr-1"/>{item.successProbability}%</Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
+                            <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 className="text-xl font-semibold mb-2">No Disputable Items Found</h3>
+                            <p className="text-muted-foreground mb-4">
+                            Our analysis did not find any items recommended for dispute.
+                            </p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
 
             <div className="bg-primary/10 p-4 rounded-lg mt-6">
               <h3 className="text-lg font-bold text-primary mb-2">

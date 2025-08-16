@@ -26,9 +26,7 @@ export async function POST(
 ) {
   const { flow } = params;
 
-  // The 'analyzeCreditReportFlow' is public for the signup process.
-  // Other flows will require authentication.
-  const isPublicFlow = flow === 'analyzeCreditReportFlow';
+  const isPublicFlow = flow === 'analyzeCreditProfileFlow';
   let uid: string | null = null;
 
   if (!isPublicFlow) {
@@ -40,7 +38,7 @@ export async function POST(
 
   try {
     const contentType = req.headers.get('content-type');
-    let input;
+    let input: any;
 
     if (contentType?.includes('multipart/form-data')) {
       const formData = await req.formData();
@@ -51,12 +49,12 @@ export async function POST(
       }
       
       const fileBuffer = await file.arrayBuffer();
-      const fileData = Array.from(new Uint8Array(fileBuffer));
+      const base64 = Buffer.from(fileBuffer).toString('base64');
+      const dataUri = `data:${file.type};base64,${base64}`;
       
-      // The flow input schema expects `fileData` and `fileName`.
+      // The new flow expects a data URI.
       input = {
-        fileData,
-        fileName: file.name,
+        creditReportDataUri: dataUri,
       };
 
     } else {
