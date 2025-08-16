@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Copy, PlusCircle, Loader2, LineChart } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/context/session-provider";
-import { collection, query, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { collection, query, getDocs, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { useEffect, useState } from "react";
 
@@ -27,7 +27,7 @@ type Affiliate = {
     id: string;
     name: string;
     status: "Active" | "Inactive";
-    joinDate: any;
+    createdAt: any;
     earnings?: number;
     type: "Affiliate";
 };
@@ -57,17 +57,20 @@ export default function AffiliatePage() {
                     ...doc.data(),
                 } as Client));
                 
-                // Fetch referred affiliates (assuming a subcollection)
-                const affiliatesQuery = query(collection(db, "affiliates", affiliateId, "referredAffiliates"));
+                // Fetch referred affiliates
+                const affiliatesQuery = query(collection(db, "affiliates"), where("referrerId", "==", affiliateId));
                 const affiliatesSnap = await getDocs(affiliatesQuery);
                 const affiliatesData: Affiliate[] = affiliatesSnap.docs.map(doc => ({
                     id: doc.id,
                     type: "Affiliate",
+                    status: "Active", // Assuming referred affiliates are active
                     earnings: 0, // Placeholder
                     ...doc.data(),
                 } as Affiliate));
                 
-                setReferrals([...clientsData, ...affiliatesData]);
+                const allReferrals = [...clientsData, ...affiliatesData];
+                allReferrals.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+                setReferrals(allReferrals);
 
             } catch (error) {
                 console.error("Failed to fetch affiliate data:", error);
@@ -84,6 +87,12 @@ export default function AffiliatePage() {
         if (!timestamp) return 'N/A';
         return new Date(timestamp.seconds * 1000).toLocaleDateString();
     };
+    
+    const getStatusVariant = (status: string) => {
+        if (status === 'Active' || status.includes('pending')) return 'secondary';
+        if (status === 'complete' || status.includes('delivered')) return 'default';
+        return 'outline'
+    }
 
   return (
     <AppLayout>
@@ -103,8 +112,8 @@ export default function AffiliatePage() {
                 </CardHeader>
                 <CardContent>
                     <div className="flex w-full max-w-lg items-center space-x-2">
-                        <Input type="text" readOnly value={`https://creditclarity.ai/ref/${user?.uid}`} />
-                        <Button type="button" onClick={() => navigator.clipboard.writeText(`https://creditclarity.ai/ref/${user?.uid}`)}>
+                        <Input type="text" readOnly value={`https://creditclarity.ai/affiliate/signup?ref=${user?.uid}`} />
+                        <Button type="button" onClick={() => navigator.clipboard.writeText(`https://creditclarity.ai/affiliate/signup?ref=${user?.uid}`)}>
                             <Copy className="mr-2 h-4 w-4"/>
                             Copy Link
                         </Button>
@@ -196,11 +205,11 @@ export default function AffiliatePage() {
                                 <TableCell className="font-medium">{referral.name}</TableCell>
                                 <TableCell>{referral.type}</TableCell>
                                 <TableCell>
-                                    <Badge variant={referral.status === 'Active' || referral.status === 'pending_analysis' ? 'secondary' : 'outline'}>
-                                        {referral.status}
+                                    <Badge variant={getStatusVariant(referral.status)}>
+                                        {referral.status.replace(/_/g, ' ')}
                                     </Badge>
                                 </TableCell>
-                                <TableCell>{formatDate(referral.createdAt || (referral as Affiliate).joinDate)}</TableCell>
+                                <TableCell>{formatDate(referral.createdAt)}</TableCell>
                                 <TableCell className="text-right">${(referral.earnings ?? 0).toFixed(2)}</TableCell>
                             </TableRow>
                         )) : (

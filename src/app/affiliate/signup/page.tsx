@@ -43,46 +43,44 @@ export default function AffiliateSignupPage() {
       await updateProfile(user, { displayName: name });
       const uid = user.uid;
 
-      // 2. Create affiliate record in Firestore
-      const affiliateRef = doc(db, "affiliates", uid);
-      await setDoc(affiliateRef, {
+      // 2. Prepare affiliate data
+      const affiliateData = {
         name,
         email,
-        referrerId: null, // We'll update this if there's a valid referral
+        referrerId: null as string | null,
         clients: [],
         referrals: [],
         earnings: 0,
-        credits: 0, // Start with 0, will be incremented
+        credits: 1, // Initial credit bonus
         tier: 'Starter',
         createdAt: serverTimestamp(),
         referralLink: `https://creditclarity.ai/affiliate/signup?ref=${uid}`,
-      });
-      
+      };
+
       // 3. Handle referral logic
       if (referralCode) {
         const referrerRef = doc(db, "affiliates", referralCode);
         const referrerSnap = await getDoc(referrerRef);
         if (referrerSnap.exists()) {
-          // Add new affiliate to referrer's list
+          // Add new affiliate to referrer's list and give bonus
           await updateDoc(referrerRef, {
             referrals: arrayUnion(uid),
-            credits: increment(1), // Bonus for referrer
+            credits: increment(1),
           });
-          // Update new affiliate's doc with referrerId
-          await updateDoc(affiliateRef, { referrerId: referralCode });
+          // Set referrerId for the new affiliate
+          affiliateData.referrerId = referralCode;
         } else {
             toast({
                 variant: "destructive",
                 title: "Invalid Referral Code",
-                description: "The referral code was not found, but your account was created.",
+                description: "The referral code was not found, but your account will be created without it.",
             });
         }
       }
-      
-      // 4. Give new affiliate a bonus
-      await updateDoc(affiliateRef, {
-          credits: increment(1),
-      });
+
+      // 4. Create affiliate record in Firestore with all data
+      const affiliateRef = doc(db, "affiliates", uid);
+      await setDoc(affiliateRef, affiliateData);
 
       toast({
         title: "Affiliate Account Created!",
