@@ -151,8 +151,8 @@ export default function LettersPage() {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to generate letter. Server says: ${errorText}`);
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to generate letter.`);
         }
         
         const result: GenerateDisputeLetterOutput = await response.json();
@@ -324,3 +324,5 @@ export default function LettersPage() {
     </AppLayout>
   );
 }
+
+    
