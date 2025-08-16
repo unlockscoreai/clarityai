@@ -229,9 +229,9 @@ export function SignupForm() {
                               {analysis.disputableItems?.length ? (
                                 <ul className="space-y-1">
                                   {analysis.disputableItems.slice(0,2).map((item, idx) => (
-                                    <li key={idx} className="bg-accent/10 p-2 rounded-lg flex justify-between items-center text-sm">
-                                      <span className="text-accent-foreground/80 truncate max-w-[200px]">{item.item}</span>
-                                      <span className="font-bold text-accent">{item.successProbability}% chance</span>
+                                    <li key={idx} className="bg-accent text-accent-foreground p-2 rounded-lg flex justify-between items-center text-sm">
+                                      <span className="truncate max-w-[200px]">{item.item}</span>
+                                      <span className="font-bold">{item.successProbability}% chance</span>
                                     </li>
                                   ))}
                                 </ul>
