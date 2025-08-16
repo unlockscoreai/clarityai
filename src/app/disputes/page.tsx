@@ -137,11 +137,12 @@ export default function DisputesPage() {
         disputeReasons: [selectedItem.reason],
       };
       
+      const idToken = await user.getIdToken();
       const response = await fetch('/api/flows/generateDisputeLetter', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await user.getIdToken()}`,
+          'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify(input),
       });
