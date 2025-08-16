@@ -5,9 +5,7 @@
  */
 
 import { z } from 'genkit';
-import pdf from 'pdf-parse';
 import { ai } from '@/ai/genkit';
-import { run } from 'genkit';
 
 const AnalyzeCreditProfileInputSchema = z.object({
   creditReportDataUri: z
@@ -60,21 +58,6 @@ C. Supporting Docs for Underwriting
 - Business incorporation docs (if applying for biz credit)
 `;
 
-// Helper: Convert data URI to buffer
-function dataUriToBuffer(dataUri: string): Buffer {
-  const matches = dataUri.match(/^data:.+;base64,(.+)$/);
-  if (!matches || !matches[1]) throw new Error('Invalid credit report data URI.');
-  return Buffer.from(matches[1], 'base64');
-}
-
-// Helper: Extract text from PDF
-async function extractPdfText(dataUri: string) {
-  const buffer = dataUriToBuffer(dataUri);
-  if (buffer.length === 0) throw new Error('Credit report PDF is empty.');
-  const { text } = await pdf(buffer);
-  return text;
-}
-
 
 const analyzeCreditProfileFlow = ai.defineFlow(
   {
@@ -83,33 +66,34 @@ const analyzeCreditProfileFlow = ai.defineFlow(
     outputSchema: AnalyzeCreditProfileOutputSchema,
   },
   async (input) => {
-    const reportText = await run('extract-text', () => extractPdfText(input.creditReportDataUri));
-
+    
     const prompt = `
-You are a professional credit analyst. Analyze the provided credit report, generate a summary and action plan, and identify potentially disputable items.
+You are a professional credit analyst. Analyze the provided credit report PDF, generate a summary and action plan, and identify potentially disputable items.
 
 Checklist for a strong credit profile:
 ${checklist}
 
-Analyze this credit report text:
+Analyze this credit report:
 ---
-${reportText}
+{{media url=creditReportDataUri}}
 ---
 
 Instructions:
-1. Parse key metrics: FICO, payment history, utilization, accounts, credit history length, inquiries.
-2. Compare against checklist.
-3. Summary: short overview.
-4. Action Items: concrete, actionable steps.
-5. Disputable Items: for each negative item, provide:
-   - item
-   - reason
-   - successProbability (0-100)
-Output in JSON format matching the schema.
+1.  Directly analyze the provided PDF. Parse key metrics like FICO score, payment history, credit utilization, account types and ages, and inquiries.
+2.  Compare the user's profile against the provided checklist.
+3.  Write a concise **Summary** of the overall credit profile.
+4.  Create a list of concrete, actionable **Action Items** the user can take to improve their credit profile based on the checklist.
+5.  Identify all negative or potentially incorrect items. For each one, create a **Disputable Item** with:
+    -   `item`: The name of the account or item (e.g., "XYZ Collections - Acct #1234").
+    -   `reason`: A clear, professional reason why this item could be disputed (e.g., "Inaccurate reporting of payment history," "Unrecognized account," "Item is past the statute of limitations.").
+    -   `successProbability`: Your expert estimate of the chance of successful removal, as a percentage from 0 to 100.
+
+Your entire output must be in JSON format that strictly adheres to the defined schema. Do not include any text outside of the JSON structure.
 `;
     const llmResponse = await ai.generate({
         prompt: prompt,
         model: 'googleai/gemini-1.5-flash',
+        input,
         output: {
             format: 'json',
             schema: AnalyzeCreditProfileOutputSchema,
