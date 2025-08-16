@@ -1,16 +1,27 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read and write their own user document
+
+    // Users can only read/write their own document
     match /users/{userId} {
       allow read, write: if request.auth.uid == userId;
     }
 
-    // Users can only read and write their own report document
+    // Users can only read/write their own report
     match /reports/{userId} {
-      allow read, write: if request.auth.uid == userId;
+       allow read, create, update: if request.auth.uid == userId;
+    }
+    
+    // Users can only create letters for themselves.
+    // Writes (updates for mail status) must be done from a trusted backend (e.g. Cloud Function).
+    match /letters/{letterId} {
+      allow read, create: if request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false; // Must be handled by a backend service
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

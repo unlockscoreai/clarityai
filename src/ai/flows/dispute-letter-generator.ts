@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview Generates personalized dispute letters based on credit analysis and dispute reasons.
+ * @fileOverview Generates personalized dispute letters, enforces credit deduction, and saves the letter to Firestore.
  *
  * - generateDisputeLetter - A function that generates the dispute letter.
  * - GenerateDisputeLetterInput - The input type for the generateDisputeLetter function.
@@ -11,6 +11,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { doc, runTransaction, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase/client';
+import { auth } from '@/lib/firebase/server';
 
 const GenerateDisputeLetterInputSchema = z.object({
   fullName: z.string().describe('The full name of the person on the report.'),
@@ -18,15 +21,16 @@ const GenerateDisputeLetterInputSchema = z.object({
   address: z.string().describe('Current address.'),
   creditBureau: z.enum(['Equifax', 'Experian', 'TransUnion']).describe('The credit bureau to send the letter to.'),
   disputedItem: z.object({
-      accountNumber: z.string().describe('The account number of the disputed item.'),
-      creditor: z.string().describe('The name of the creditor for the disputed item.'),
+      // We no longer need account number since it's part of the name
+      name: z.string().describe('The name of the creditor and account for the disputed item. e.g., "ABC Collections - Acct ••1234"'),
+      reason: z.string().describe('The reason for the dispute.'),
   }),
-  disputeReasons: z.array(z.string()).describe('A list of reasons for the dispute.'),
 });
 export type GenerateDisputeLetterInput = z.infer<typeof GenerateDisputeLetterInputSchema>;
 
 const GenerateDisputeLetterOutputSchema = z.object({
   letterContent: z.string().describe('The generated dispute letter content in plain text format.'),
+  letterId: z.string().describe('The ID of the newly created letter document in Firestore.'),
 });
 export type GenerateDisputeLetterOutput = z.infer<typeof GenerateDisputeLetterOutputSchema>;
 
@@ -37,7 +41,6 @@ export async function generateDisputeLetter(input: GenerateDisputeLetterInput): 
 const disputeLetterPrompt = ai.definePrompt({
   name: 'disputeLetterPrompt',
   input: {schema: GenerateDisputeLetterInputSchema},
-  output: {schema: GenerateDisputeLetterOutputSchema},
   prompt: `
   You are an expert in writing legally compliant and effective credit dispute letters under the Fair Credit Reporting Act (FCRA).
 
@@ -50,8 +53,8 @@ const disputeLetterPrompt = ai.definePrompt({
       *   **Equifax:** Equifax Information Services LLC, P.O. Box 740256, Atlanta, GA 30374
       *   **Experian:** Experian, P.O. Box 4500, Allen, TX 75013
       *   **TransUnion:** TransUnion LLC Consumer Dispute Center, P.O. Box 2000, Chester, PA 19016
-  4.  **Reference the disputed account** clearly by name (creditor) and account number.
-  5.  **State the reason for the dispute.** Clearly explain that the item is inaccurate and being challenged. Incorporate the specific dispute reasons from the input.
+  4.  **Reference the disputed account** clearly by its name/creditor ("{{disputedItem.name}}").
+  5.  **State the reason for the dispute.** Clearly explain that the item is inaccurate and being challenged, using the provided reason: "{{disputedItem.reason}}".
   6.  **Formally request an investigation and deletion.** Cite the FCRA requirement for the bureau to investigate and remove unverified or inaccurate information within 30 days.
   7.  **Include a closing statement** requesting a copy of the investigation results and an updated copy of the credit report.
   8.  **The closing should be "Sincerely," followed by the user's full name.**
@@ -76,8 +79,51 @@ const generateDisputeLetterFlow = ai.defineFlow(
     inputSchema: GenerateDisputeLetterInputSchema,
     outputSchema: GenerateDisputeLetterOutputSchema,
   },
-  async input => {
-    const {output} = await disputeLetterPrompt(input);
-    return output!;
+  async (input, context) => {
+    
+    // 1. Credit Enforcement and Deduction
+    const userRef = doc(db, "users", context.auth.uid);
+    
+    await runTransaction(db, async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) {
+            throw new Error("User not found.");
+        }
+        const credits = userDoc.data()?.credits ?? 0;
+        if (credits < 1) {
+            throw new Error("Not enough credits to generate a letter.");
+        }
+        
+        // Decrement credits
+        transaction.update(userRef, { credits: credits - 1 });
+    });
+
+    // 2. Generate Letter Content
+    const {text: letterContent} = await ai.generate({
+        prompt: (await disputeLetterPrompt.render({input})).prompt,
+    });
+    
+    if (!letterContent) {
+        // Rollback credit deduction would be complex. For now, we log and proceed.
+        // A more robust solution could involve a "credit hold" and "commit" pattern.
+        console.error("AI failed to generate letter content after credit deduction.");
+        throw new Error("Failed to generate letter content.");
+    }
+    
+    // 3. Store Letter in Firestore
+    const letterData = {
+        userId: context.auth.uid,
+        ...input,
+        letterContent,
+        createdAt: serverTimestamp(),
+        mailed: false, // For auto-mailer service
+    };
+
+    const letterDocRef = await addDoc(collection(db, "letters"), letterData);
+
+    return {
+        letterContent,
+        letterId: letterDocRef.id,
+    };
   }
 );
