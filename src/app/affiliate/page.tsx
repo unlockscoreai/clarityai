@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Copy, PlusCircle, Loader2 } from "lucide-react";
+import { Copy, PlusCircle, Loader2, LineChart } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "@/context/session-provider";
 import { collection, query, getDocs, doc, onSnapshot } from "firebase/firestore";
@@ -95,7 +95,7 @@ export default function AffiliatePage() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
             <Card>
                 <CardHeader>
                     <CardTitle>Your Referral Link</CardTitle>
@@ -121,6 +121,20 @@ export default function AffiliatePage() {
                         <Link href="/affiliate/add-client">
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add Client
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+             <Card>
+                <CardHeader>
+                    <CardTitle>View Reports</CardTitle>
+                    <CardDescription>See detailed reports of your earnings and referrals over time.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button asChild variant="outline">
+                        <Link href="/affiliate/reports">
+                            <LineChart className="mr-2 h-4 w-4" />
+                            View Reports
                         </Link>
                     </Button>
                 </CardContent>
@@ -204,4 +218,3 @@ export default function AffiliatePage() {
     </AppLayout>
   );
 }
-
