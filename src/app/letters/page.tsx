@@ -141,7 +141,7 @@ export default function LettersPage() {
                 reason: item.reason,
             },
         };
-        const response = await fetch('/api/flows/generateDisputeLetter', {
+        const response = await fetch('/api/flows/generateDisputeLetterFlow', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -324,5 +324,3 @@ export default function LettersPage() {
     </AppLayout>
   );
 }
-
-    

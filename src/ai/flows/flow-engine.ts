@@ -12,13 +12,13 @@ import {getFlow} from 'genkit';
  * @param data The input data for the flow.
  * @returns The output of the executed flow.
  */
-export async function createFlowsEndpoint(flow: string, data: any) {
+export async function createFlowsEndpoint(flow: string, data: any, context?: any) {
   try {
     const flowToRun = getFlow(flow);
     if (!flowToRun) {
       throw new Error(`Flow "${flow}" not found.`);
     }
-    const response = await flowToRun.run(data);
+    const response = await flowToRun.run(data, context);
     return response;
   } catch (error: any) {
     console.error(`Error executing flow "${flow}":`, error);

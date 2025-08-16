@@ -13,6 +13,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { doc, runTransaction, serverTimestamp, collection, addDoc, increment, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
+import { defineFlow, run } from 'genkit';
 
 export const GenerateDisputeLetterInputSchema = z.object({
   fullName: z.string().describe('The full name of the person on the report.'),
@@ -97,10 +98,8 @@ export const generateDisputeLetterFlow = ai.defineFlow(
             // 1. Deduct credit (within transaction)
             transaction.update(userRef, { credits: increment(-1) });
             
-            // 2. Generate Letter Content (outside transaction if it's a long-running external call, but fine here)
-            const {text: letterContent} = await ai.generate({
-                prompt: (await disputeLetterPrompt.render({input})).prompt,
-            });
+            // 2. Generate Letter Content
+            const {text: letterContent} = await run('disputeLetterPrompt', () => disputeLetterPrompt(input));
 
             if (!letterContent) {
                 // By throwing an error here, the transaction will automatically roll back.
