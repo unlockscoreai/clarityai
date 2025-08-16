@@ -59,10 +59,8 @@ function AnalyzeReportCard() {
             const formData = new FormData();
             formData.append('file', file);
 
-            const idToken = await user.getIdToken();
-            const response = await fetch('/api/flows/analyzeCreditProfileFlow', {
+            const response = await fetch('/api/analyze', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}` },
                 body: formData,
             });
 

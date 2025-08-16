@@ -83,7 +83,7 @@ export function SignupForm() {
       const formData = new FormData();
       formData.append('file', reportFile);
       
-      const response = await fetch('/api/flows/analyzeCreditProfileFlow', {
+      const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
       });
