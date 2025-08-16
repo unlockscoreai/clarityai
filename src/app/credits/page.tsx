@@ -8,6 +8,7 @@ import { Check, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/context/session-provider";
 import { useToast } from "@/hooks/use-toast";
+import { getStripe } from "@/lib/stripe-client";
 
 const subscriptionPlans = [
     {
@@ -42,7 +43,6 @@ const creditPacks = [
     { credits: 20, price: 260 },
 ]
 
-
 export default function CreditsPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const { user } = useSession();
@@ -58,17 +58,39 @@ export default function CreditsPage() {
         return;
     }
 
-    const { name, credits, price } = 'name' in item ? {name: item.name, credits: item.credits, price: item.price} : {name: null, credits: item.credits, price: `$${item.price}`};
-    setLoading(name || `credits-${credits}`);
+    const itemIdentifier = 'name' in item ? item.name : `credits-${item.credits}`;
+    setLoading(itemIdentifier);
 
     try {
-        // Mock checkout
-        await new Promise(resolve => setTimeout(resolve, 1500));
-         toast({
-            title: "Purchase not implemented",
-            description: "This is a demo. No real purchase was made."
+        const idToken = await user.getIdToken();
+        const res = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+                plan: 'name' in item ? item : null,
+                credits: 'credits' in item && !('name' in item) ? item : null,
+                user: {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                }
+            })
         });
 
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || "Checkout failed");
+        }
+
+        const { sessionId } = await res.json();
+        const stripe = await getStripe();
+        if (!stripe) {
+            throw new Error("Stripe.js failed to load.");
+        }
+        await stripe.redirectToCheckout({ sessionId });
 
     } catch (err: any) {
          toast({
