@@ -7,9 +7,10 @@ import {stripe} from '@/lib/stripe';
 import {headers} from 'next/headers';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
+import { coupons } from '@/lib/coupons';
 
 export async function POST(req: Request) {
-  const { plan, credits, user: authedUser } = await req.json();
+  const { plan, credits, coupon, user: authedUser } = await req.json();
   const headersList = headers();
   const origin = headersList.get('origin');
 
@@ -21,14 +22,6 @@ export async function POST(req: Request) {
     if (!session || session.uid !== authedUser.uid) {
       return NextResponse.json({error: 'Unauthorized'}, {status: 401});
     }
-
-    // Since we don't have a server-side db instance, we can't fetch the user doc here.
-    // We will create the customer if needed, and rely on the webhook to update the user doc.
-    // For now, let's assume we create a new customer each time for simplicity,
-    // or retrieve it if we have an ID. Webhooks can later consolidate this.
-    
-    // A robust implementation would query Firestore for a user with this UID
-    // to see if a stripeCustomerId already exists.
     
     const customer = await stripe.customers.create({
       email: session.email,
@@ -72,7 +65,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'No items in cart'}, {status: 400});
     }
 
-    const checkoutSession = await stripe.checkout.sessions.create({
+    const checkoutSessionOptions: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items,
@@ -81,9 +74,26 @@ export async function POST(req: Request) {
       cancel_url: `${origin}/credits`,
       metadata: {
         firebaseUID: session.uid,
-        stripeCustomerId: stripeCustomerId, // Pass this to the webhook
+        stripeCustomerId: stripeCustomerId,
       },
-    });
+    };
+    
+    // Check if a valid coupon code is provided
+    if (coupon && coupons[coupon as keyof typeof coupons]) {
+        // This assumes you have already created coupons in your Stripe dashboard
+        // with the IDs matching the keys in your `coupons` object.
+        const createdStripeCoupons = await stripe.coupons.list();
+        const stripeCoupon = createdStripeCoupons.data.find(c => c.name?.toUpperCase().startsWith(coupon));
+
+        if (stripeCoupon) {
+            checkoutSessionOptions.discounts = [{ coupon: stripeCoupon.id }];
+        } else {
+             console.warn(`Stripe coupon for code "${coupon}" not found.`);
+        }
+    }
+
+
+    const checkoutSession = await stripe.checkout.sessions.create(checkoutSessionOptions);
 
     return NextResponse.json({ sessionId: checkoutSession.id });
 

@@ -4,11 +4,15 @@
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Check, Loader2, Gift } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/context/session-provider";
 import { useToast } from "@/hooks/use-toast";
 import { getStripe } from "@/lib/stripe-client";
+import { coupons } from "@/lib/coupons";
 
 const subscriptionPlans = [
     {
@@ -45,8 +49,23 @@ const creditPacks = [
 
 export default function CreditsPage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [bonusInfo, setBonusInfo] = useState<{ credits: number; description: string } | null>(null);
   const { user } = useSession();
   const { toast } = useToast();
+  
+  const handleCouponChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const code = e.target.value.toUpperCase();
+    setCouponCode(code);
+
+    const couponData = coupons[code as keyof typeof coupons];
+    if (couponData) {
+      setBonusInfo(couponData);
+    } else {
+      setBonusInfo(null);
+    }
+  };
+
 
   const handleCheckout = async (item: {name: string, price: string, credits: string} | {credits: number, price: number}) => {
     if (!user) {
@@ -72,6 +91,7 @@ export default function CreditsPage() {
             body: JSON.stringify({
                 plan: 'name' in item ? item : null,
                 credits: 'credits' in item && !('name' in item) ? item : null,
+                coupon: couponCode,
                 user: {
                     uid: user.uid,
                     email: user.email,
@@ -112,6 +132,36 @@ export default function CreditsPage() {
             Manage your subscription and purchase additional credits.
           </p>
         </div>
+
+        <section>
+          <Card className="max-w-md">
+            <CardHeader>
+              <CardTitle>Have a Coupon?</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="coupon">Coupon Code</Label>
+                <Input
+                  id="coupon"
+                  placeholder="Enter code here"
+                  value={couponCode}
+                  onChange={handleCouponChange}
+                  className="uppercase"
+                />
+              </div>
+              {bonusInfo && (
+                <Alert className="bg-accent/10 border-accent/50 text-accent-foreground">
+                  <Gift className="h-4 w-4 text-accent" />
+                  <AlertTitle className="text-accent font-bold">Coupon Applied!</AlertTitle>
+                  <AlertDescription>
+                    {bonusInfo.description}. You’ll receive {bonusInfo.credits} bonus credits!
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
 
         <section>
             <h2 className="text-2xl font-headline font-semibold mb-4">Subscription Plans</h2>
