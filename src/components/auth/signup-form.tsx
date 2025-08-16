@@ -30,23 +30,6 @@ import { AnalyzeCreditReportInput } from "@/ai/flows/credit-report-analyzer";
 
 type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
 
-function fileToByteArray(file: File): Promise<number[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result instanceof ArrayBuffer) {
-        const arrayBuffer = event.target.result;
-        const uint8Array = new Uint8Array(arrayBuffer);
-        resolve(Array.from(uint8Array));
-      } else {
-        reject(new Error('Failed to read file as ArrayBuffer.'));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
-}
-
 export function SignupForm() {
   const router = useRouter();
   const { toast } = useToast();
@@ -98,10 +81,10 @@ export function SignupForm() {
     setError(null);
 
     try {
-      const fileData = await fileToByteArray(reportFile);
-      const input: AnalyzeCreditReportInput = { 
-          fileData,
-          fileName: reportFile.name,
+      const fileBuffer = await reportFile.arrayBuffer();
+      const input: AnalyzeCreditReportInput = {
+        fileData: Array.from(new Uint8Array(fileBuffer)),
+        fileName: reportFile.name,
       };
       
       const response = await fetch('/api/flows/analyzeCreditReport', {

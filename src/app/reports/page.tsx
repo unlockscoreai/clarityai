@@ -13,23 +13,6 @@ import { useSession } from '@/context/session-provider';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 
-function fileToByteArray(file: File): Promise<number[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result instanceof ArrayBuffer) {
-        const arrayBuffer = event.target.result;
-        const uint8Array = new Uint8Array(arrayBuffer);
-        resolve(Array.from(uint8Array));
-      } else {
-        reject(new Error('Failed to read file as ArrayBuffer.'));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
-  });
-}
-
 export default function ReportsPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,10 +43,9 @@ export default function ReportsPage() {
     setAnalysis(null);
 
     try {
-      const fileData = await fileToByteArray(file);
-
+      const fileBuffer = await file.arrayBuffer();
       const input: AnalyzeCreditReportInput = {
-        fileData,
+        fileData: Array.from(new Uint8Array(fileBuffer)),
         fileName: file.name,
       };
 

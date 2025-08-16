@@ -77,9 +77,15 @@ STRICT OUTPUT FORMAT (must be VALID JSON, no extra text):
  * Helper: try to coerce the model output into JSON if it wraps it with text.
  */
 function extractJsonBlock(text: string): string {
-  // Try to pull the first {...} block
-  const match = text.match(/\{[\s\S]*\}$/m) || text.match(/\{[\s\S]*\}/m);
-  return match ? match[0] : text;
+  // Strip code fences like ```json ... ```
+  text = text.replace(/```(?:json)?/gi, "").trim();
+
+  // Find the first {...} block
+  const match = text.match(/\{[\s\S]*\}/m);
+  if (match) return match[0];
+
+  // Fall back to raw text
+  return text;
 }
 
 
@@ -116,14 +122,17 @@ const analyzeCreditReportFlow = ai.defineFlow(
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
-    } catch (e) {
-      throw new Error(
-        "AI returned non-JSON. Check prompt or model settings. Raw:\n" + raw
-      );
+    } catch {
+      throw new Error("AI returned invalid JSON: " + raw);
     }
 
-    // 4) Validate against schema (throws if shape is wrong)
-    const output = AnalyzeCreditReportOutputSchema.parse(parsed);
-    return output;
+    // Use Zod safeParse to avoid hard crash
+    const result = AnalyzeCreditReportOutputSchema.safeParse(parsed);
+    if (!result.success) {
+      console.error("Schema validation failed", result.error.format());
+      throw new Error("Invalid analysis schema. Raw:\n" + raw);
+    }
+
+    return result.data;
   }
 );
