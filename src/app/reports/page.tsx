@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
 
@@ -64,7 +64,8 @@ export default function ReportsPage() {
       setAnalysis(result);
 
       // Save the analysis to Firestore
-      await setDoc(doc(db, "reports", user.uid), {
+      const reportsCollectionRef = collection(db, "reports");
+      await addDoc(reportsCollectionRef, {
           ...result,
           userId: user.uid,
           fileName: file.name,

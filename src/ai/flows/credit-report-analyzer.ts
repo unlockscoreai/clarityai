@@ -37,59 +37,22 @@ export type AnalyzeCreditReportOutput = z.infer<typeof AnalyzeCreditReportOutput
 // #endregion
 
 const SYSTEM_PROMPT = `
-You are an AI credit report analyst.
+You are an AI credit report analyst. Your goal is to analyze the provided credit report text and return a valid JSON object with specific metrics and actionable advice.
 
-Goal:
-Return a strictly valid JSON object with summary metrics and recommended dispute targets.
+Your response MUST be a valid JSON object that conforms to the provided schema. Do not include any text, markdown, or code fences before or after the JSON object.
 
-Count metrics using the provided credit report text:
-- derogatoryCount: number of negative items (collections, charge-offs, public records, 30/60/90+ day lates still reporting)
-- openAccounts: number of currently open/active accounts
-- inquiryCount: number of hard inquiries in the last 24 months (if range unclear, count all hard inquiries listed)
-- totalAccounts: total accounts including closed
-
-Build challengeItems:
-For each derogatory or questionable entry, add an item with:
-- name: creditor/collector + last 4 of the account if present
-- reason: concise dispute basis (e.g., "Unverified account", "Incorrect balance/DOFD", "Not mine", "Paid but still reporting")
-- successChance: integer from 0 to 100 estimating removal/correction likelihood
-
-Build actionPlan:
-Create 3–6 clear steps that would measurably improve the score (e.g., paydown amounts to reach <30% utilization, remove authorized user risks, add credit-builder loan, stop new applications, goodwill requests, etc.). Keep each step one sentence.
-
-STRICT OUTPUT FORMAT (must be VALID JSON, no extra text):
-{
-  "derogatoryCount": number,
-  "openAccounts": number,
-  "inquiryCount": number,
-  "totalAccounts": number,
-  "challengeItems": [
-    { "name": string, "reason": string, "successChance": number }
-  ],
-  "actionPlan": [string, ...]
-}
+Based on the credit report text, provide the following:
+- derogatoryCount: Count of all negative items (collections, charge-offs, public records, late payments).
+- openAccounts: Count of all currently open accounts.
+- inquiryCount: Count of all hard inquiries listed.
+- totalAccounts: The total number of accounts, both open and closed.
+- challengeItems: An array of items recommended for dispute. For each, provide the creditor's name, the reason for the dispute (e.g., "Unverified account", "Incorrect balance"), and an estimated success chance (0-100).
+- actionPlan: A list of 3-5 clear, concise, and actionable steps to improve the credit score (e.g., "Pay down credit card X to below 30% utilization.").
 `;
-
-/**
- * Helper: try to coerce the model output into JSON if it wraps it with text.
- */
-function extractJsonBlock(text: string): string {
-  // Strip code fences like ```json ... ```
-  text = text.replace(/```(?:json)?/gi, "").trim();
-
-  // Find the first {...} block
-  const match = text.match(/\{[\s\S]*\}/m);
-  if (match) return match[0];
-
-  // Fall back to raw text
-  return text;
-}
-
 
 export async function analyzeCreditReport(input: AnalyzeCreditReportInput): Promise<AnalyzeCreditReportOutput> {
   return analyzeCreditReportFlow(input);
 }
-
 
 const analyzeCreditReportFlow = ai.defineFlow(
   {
@@ -104,30 +67,25 @@ const analyzeCreditReportFlow = ai.defineFlow(
 
     // 2) Ask the model
     const prompt = `${SYSTEM_PROMPT}\n\nCREDIT REPORT TEXT:\n${reportText}\n`;
-    const {text} = await ai.generate({
+    const llmResponse = await ai.generate({
       prompt,
       temperature: 0.2,
+      model: 'googleai/gemini-1.5-flash',
+      output: {
+        format: 'json',
+        schema: AnalyzeCreditReportOutputSchema,
+      },
     });
 
-    if (!text) {
-        // Fallback to defaults if AI returns nothing
+    const output = llmResponse.output();
+
+    if (!output) {
+        console.error("AI returned no output.");
         return AnalyzeCreditReportOutputSchema.parse({});
     }
-
-    // 3) Parse JSON strictly
-    let raw = extractJsonBlock(text);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      console.error("AI returned invalid JSON: " + raw);
-      // Fallback to defaults if JSON is malformed
-      return AnalyzeCreditReportOutputSchema.parse({});
-    }
-
-    // Use Zod safeParse to avoid hard crash and apply defaults
-    const result = AnalyzeCreditReportOutputSchema.safeParse(parsed);
+    
+    // Use Zod safeParse to validate and apply defaults if needed
+    const result = AnalyzeCreditReportOutputSchema.safeParse(output);
     if (!result.success) {
       console.warn("Schema validation failed, applying defaults:", result.error.format());
       return AnalyzeCreditReportOutputSchema.parse({}); // fallback to defaults
