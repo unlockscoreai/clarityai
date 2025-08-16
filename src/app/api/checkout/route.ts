@@ -34,9 +34,11 @@ export async function POST(req: Request) {
 
     const line_items = [];
     let planIdentifier = '';
+    let mode: Stripe.Checkout.SessionCreateParams.Mode = 'payment'; // Default to one-time payment
 
     if (plan) {
         planIdentifier = plan.name.toLowerCase();
+        mode = 'subscription'; // Set to subscription mode for plans
         line_items.push({
             price_data: {
                 currency: 'usd',
@@ -45,6 +47,9 @@ export async function POST(req: Request) {
                     description: plan.credits,
                 },
                 unit_amount: parseInt(plan.price.replace('$', '')) * 100,
+                recurring: {
+                    interval: 'month',
+                }
             },
             quantity: 1,
         });
@@ -71,7 +76,7 @@ export async function POST(req: Request) {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items,
-      mode: 'payment',
+      mode,
       success_url: `${origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/credits`,
       metadata: {
@@ -83,8 +88,6 @@ export async function POST(req: Request) {
     
     // Check if a valid coupon code is provided
     if (coupon && coupons[coupon as keyof typeof coupons]) {
-        // This assumes you have already created coupons in your Stripe dashboard
-        // with the IDs matching the keys in your `coupons` object.
         const createdStripeCoupons = await stripe.coupons.list();
         const stripeCoupon = createdStripeCoupons.data.find(c => c.name?.toUpperCase().startsWith(coupon));
 
