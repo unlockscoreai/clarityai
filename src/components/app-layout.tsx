@@ -12,6 +12,7 @@ import {
   PanelLeft,
   Settings,
   User,
+  Star,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -39,6 +40,7 @@ const navItems = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/reports", icon: FileText, label: "Reports" },
   { href: "/letters", icon: GanttChartSquare, label: "Letters" },
+  { href: "/boosters", icon: Star, label: "Boosters" },
   { href: "/credits", icon: CreditCard, label: "Credits" },
   { href: "/affiliate", icon: Handshake, label: "Affiliate" },
 ];
@@ -208,3 +210,5 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+    

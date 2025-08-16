@@ -1,54 +1,67 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default deny all reads and writes
-    match /{document=**} {
-      allow read, write: if false;
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Allow users to read/write their own document
+    // Helper function to check if the user owns the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Users can only read/write their own data
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid != null;
+      allow read, update, delete: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated();
     }
-
-    // Allow users to read their own reports
-    match /reports/{userId} {
-      allow read, write: if request.auth.uid == userId;
+    
+    // Reports can only be read/created by the owner
+    match /reports/{reportId} {
+      allow read, create: if isAuthenticated() && isOwner(request.resource.data.userId);
+      // Generally, reports should be immutable
+      allow update, delete: if false; 
     }
-
-    // Allow users to read/write their own letters
+    
+    // Letters can only be read/created by the owner
     match /letters/{letterId} {
-        allow read, write: if request.resource.data.userId == request.auth.uid;
+       allow read, create: if isAuthenticated() && isOwner(request.resource.data.userId);
+       // Allow owner to update mail status
+       allow update: if isAuthenticated() && isOwner(resource.data.userId);
+       allow delete: if false;
     }
-    
-    // Allow public creation of affiliate accounts
+
+    // Affiliates can manage their own data and client list
     match /affiliates/{affiliateId} {
-        allow create: if request.auth.uid != null;
-        allow read: if request.auth.uid != null;
-        // Allow an affiliate to update another affiliate's record for referrals
-        allow update: if request.auth.uid != null && (
-            (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['referrals', 'credits']))
-        );
+      allow read, update: if isAuthenticated() && isOwner(affiliateId);
+      allow create: if isAuthenticated();
+      
+      // Clients of an affiliate can be managed by that affiliate
+      match /clients/{clientId} {
+        allow read, write: if isAuthenticated() && isOwner(affiliateId);
+      }
+      // Referred affiliates subcollection
+      match /referredAffiliates/{referredId} {
+        allow read, write: if isAuthenticated() && isOwner(affiliateId);
+      }
     }
     
-    // Allow affiliates to manage their own clients
-    match /affiliates/{affiliateId}/clients/{clientId} {
-      allow read, write: if request.auth.uid == affiliateId;
+    // Affiliate stats can be read by anyone, but only written server-side
+    match /affiliateStats/{statId} {
+        allow read: if true;
+        allow write: if false; // Should be updated via a trusted backend process
     }
 
-    // Allow backend to write transactions
-    match /transactions/{transactionId} {
-        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Example for backend/admin role
-        allow read: if request.auth.uid != null; // Allow affiliates to read their transactions
-    }
-
-    // Allow backend to write stats, and authenticated users to read
-    match /affiliateStats/{affiliateId} {
-       allow read: if request.auth.uid != null;
-       allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // Credit Boosters are publically readable
+    match /creditBoosters/{boosterId} {
+      allow read: if true;
+      allow write: if false; // Should be managed from the backend/console
     }
   }
 }
+
+    
