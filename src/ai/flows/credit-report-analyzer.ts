@@ -63,16 +63,11 @@ C. Supporting Docs for Underwriting
 `;
 
 
-const analyzeCreditProfileFlow = ai.defineFlow(
-  {
-    name: 'analyzeCreditProfileFlow',
-    inputSchema: AnalyzeCreditProfileInputSchema,
-    outputSchema: AnalyzeCreditProfileOutputSchema,
-  },
-  async (input) => {
-    
-    const prompt = `
-You are a professional credit analyst with an encouraging and optimistic tone. Your goal is to empower the user to improve their credit. Analyze the provided credit report PDF and generate a detailed analysis.
+const analyzeCreditProfilePrompt = ai.definePrompt({
+    name: 'analyzeCreditProfilePrompt',
+    input: { schema: AnalyzeCreditProfileInputSchema },
+    output: { schema: AnalyzeCreditProfileOutputSchema },
+    prompt: `You are a professional credit analyst with an encouraging and optimistic tone. Your goal is to empower the user to improve their credit. Analyze the provided credit report PDF and generate a detailed analysis.
 
 Checklist for a strong credit profile:
 ${checklist}
@@ -86,31 +81,29 @@ Instructions:
 1.  Directly analyze the provided PDF. Parse key metrics.
 2.  Write a concise, encouraging **Summary** of the overall credit profile, highlighting strengths and opportunities.
 3.  Create a **Breakdown by Credit Factor**. For each of the 5 main factors (Payment History, Credit Utilization, Credit Mix, Hard Inquiries, Age of Accounts), provide:
-    -   `title`: The name of the factor.
-    -   `description`: A clear, simple explanation of the user's status for this factor.
-    -   `impact`: A tangible potential score improvement or a clear statement on its effect (e.g., "+20 points if reduced below 30%", "Score impact will decrease over 6-12 months").
+    -   \`title\`: The name of the factor.
+    -   \`description\`: A clear, simple explanation of the user's status for this factor.
+    -   \`impact\`: A tangible potential score improvement or a clear statement on its effect (e.g., "+20 points if reduced below 30%", "Score impact will decrease over 6-12 months").
 4.  Create a list of concrete, actionable **Action Items** the user can take.
 5.  Identify all negative or potentially incorrect items for the **Disputable Items** list. For each, provide:
-    -   `item`: The name of the account or item.
-    -   `reason`: A clear, professional reason for the dispute.
-    -   `successProbability`: Your expert estimate of the chance of successful removal (0-100).
+    -   \`item\`: The name of the account or item.
+    -   \`reason\`: A clear, professional reason for the dispute.
+    -   \`successProbability\`: Your expert estimate of the chance of successful removal (0-100).
 
 Your entire output must be in JSON format that strictly adheres to the defined schema.
-`;
-    const llmResponse = await ai.generate({
-        prompt: prompt,
-        model: 'googleai/gemini-1.5-flash',
-        input,
-        output: {
-            format: 'json',
-            schema: AnalyzeCreditProfileOutputSchema,
-        },
-        temperature: 0.2
-    });
+`,
+});
 
-    const output = llmResponse.output();
+
+const analyzeCreditProfileFlow = ai.defineFlow(
+  {
+    name: 'analyzeCreditProfileFlow',
+    inputSchema: AnalyzeCreditProfileInputSchema,
+    outputSchema: AnalyzeCreditProfileOutputSchema,
+  },
+  async (input) => {
+    const { output } = await analyzeCreditProfilePrompt(input);
     if (!output) throw new Error('AI failed to produce analysis output.');
-    
     return output;
   }
 );
