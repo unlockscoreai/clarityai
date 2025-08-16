@@ -85,18 +85,20 @@ Your entire output must be a single JSON object that strictly adheres to the def
 });
 
 
-export const generateAndSaveLetterFlow = ai.defineFlow(
+export const generateCreditDisputeLetter = ai.defineFlow(
   {
     name: 'generateCreditDisputeLetter',
     inputSchema: GenerateCreditDisputeLetterInputSchema,
     outputSchema: GenerateCreditDisputeLetterOutputSchema,
   },
   async (input, context) => {
-    // This flow is now solely responsible for generating the letter content
-    // Firestore operations (deducting credits, saving letter) are handled in the API route
-    const { output: letterPackage } = await generateCreditDisputeLetterPrompt(
-      input as any
-    );
+    const { output: letterPackage } = await generateCreditDisputeLetterPrompt({
+      ...input,
+      personalInformation: JSON.stringify(input.personalInformation),
+    });
+    if (!letterPackage) {
+      throw new Error('Failed to generate letter package');
+    }
     return letterPackage;
   },
 );
