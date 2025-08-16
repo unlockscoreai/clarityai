@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 import {
   ArrowUpRight,
@@ -29,6 +30,7 @@ import {
   FileText,
   Upload,
   Loader2,
+  MailWarning,
 } from "lucide-react";
 import React, { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +39,7 @@ import { useRouter } from "next/navigation";
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { AnalyzeCreditProfileOutput } from "@/ai/flows/credit-report-analyzer";
+import { sendEmailVerification } from "firebase/auth";
 
 function AnalyzeReportCard() {
     const [loading, setLoading] = useState(false);
@@ -124,11 +127,56 @@ function AnalyzeReportCard() {
     )
 }
 
+function EmailVerificationBanner() {
+    const { user } = useSession();
+    const { toast } = useToast();
+    const [loading, setLoading] = useState(false);
+
+    if (!user || user.emailVerified) {
+        return null;
+    }
+
+    const handleResend = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            await sendEmailVerification(user);
+            toast({
+                title: "Verification Email Sent",
+                description: "A new verification link has been sent to your email address.",
+            });
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error Sending Email",
+                description: error.message,
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Alert variant="destructive" className="lg:col-span-2">
+            <MailWarning className="h-4 w-4" />
+            <AlertTitle>Verify Your Email Address</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+                Please check your inbox to verify your email. This is required to secure your account.
+                <Button onClick={handleResend} variant="outline" size="sm" disabled={loading}>
+                    {loading ? <Loader2 className="animate-spin mr-2"/> : null}
+                    Resend Verification
+                </Button>
+            </AlertDescription>
+        </Alert>
+    );
+}
+
 export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
         <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
+            <EmailVerificationBanner />
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">

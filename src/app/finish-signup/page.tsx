@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getAuth, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
@@ -74,8 +74,11 @@ export default function FinishSignUpPage() {
                 userId: user.uid,
                 createdAt: serverTimestamp(),
             });
+            
+            // Send verification email
+            await sendEmailVerification(user);
 
-            toast({ title: "Account Created!", description: "Welcome to Credit Clarity AI." });
+            toast({ title: "Account Created!", description: "Welcome to Credit Clarity AI. Please check your email to verify your account." });
           } else {
             // This is an existing user logging in
             setMessage('Sign in successful! Redirecting...');
