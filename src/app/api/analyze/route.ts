@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const storage = getStorage();
     const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
     if (!bucketName) {
-        throw new Error("Firebase Storage bucket name is not configured.");
+        throw new Error("Firebase Storage bucket name is not configured in environment variables.");
     }
     const bucket = storage.bucket(bucketName);
     const filePath = `reports/${userId}/${Date.now()}-${file.name}`;

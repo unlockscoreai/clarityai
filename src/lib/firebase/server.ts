@@ -15,4 +15,4 @@ const app = getApps().length === 0
   : getApp();
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const adminDB = getFirestore(app);

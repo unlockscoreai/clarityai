@@ -4,9 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { generateCreditDisputeLetter, GenerateCreditDisputeLetterInputSchema } from '@/ai/flows/dispute-letter-generator';
-import { auth as adminAuth } from '@/lib/firebase/server';
+import { auth as adminAuth, adminDB } from '@/lib/firebase/server';
 import { doc, runTransaction, serverTimestamp, collection, addDoc, increment } from 'firebase/firestore';
-import { db } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,11 +19,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const input = GenerateCreditDisputeLetterInputSchema.parse(body);
 
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(adminDB, "users", userId);
 
     let letterPackage;
 
-    await runTransaction(db, async (transaction) => {
+    await runTransaction(adminDB, async (transaction) => {
         const userDoc = await transaction.get(userDocRef);
         if (!userDoc.exists()) {
             throw new Error("User document not found.");
@@ -38,7 +37,7 @@ export async function POST(req: NextRequest) {
         letterPackage = await generateCreditDisputeLetter(input);
         
         // Add the generated letter to the letters subcollection
-        const lettersCollectionRef = collection(db, "letters");
+        const lettersCollectionRef = collection(adminDB, "letters");
         await addDoc(lettersCollectionRef, {
             userId: userId,
             letterPackage,

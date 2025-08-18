@@ -3,13 +3,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import type { Stripe } from 'stripe';
 import { doc, updateDoc, serverTimestamp, increment, runTransaction, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/server"; // Correctly import server-side db
+import { adminDB } from "@/lib/firebase/server"; // Correctly import server-side db
 
 // Helper to determine credits to add from line items
 const getCreditsFromLineItems = (lineItems: Stripe.LineItem[]): number => {
     let credits = 0;
     lineItems.forEach(item => {
-        const productName = item.price?.product.name ?? '';
+        const productName = item.price?.product && typeof item.price.product === 'object' ? item.price.product.name : '';
         if (productName.toLowerCase().includes('credit pack')) {
             const match = productName.match(/(\d+)\s*Credit/);
             if (match) {
@@ -53,7 +53,8 @@ export async function POST(req: NextRequest) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     
-    if (!session.metadata?.firebaseUID) {
+    const firebaseUID = session.metadata?.firebaseUID;
+    if (!firebaseUID) {
       console.error("Webhook Error: No firebaseUID in session metadata.");
       return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
     }
@@ -66,7 +67,8 @@ export async function POST(req: NextRequest) {
       const creditsFromCoupon = getCreditsFromCoupon(expandedSession);
       const totalCreditsToAdd = creditsFromPurchase + creditsFromCoupon;
       
-      const { firebaseUID, stripeCustomerId, plan, affiliateId, clientId } = session.metadata;
+      // Safely access metadata
+      const { stripeCustomerId, plan, affiliateId, clientId } = session.metadata || {};
 
       const updateData: { [key: string]: any } = {
           updatedAt: serverTimestamp()
@@ -87,13 +89,13 @@ export async function POST(req: NextRequest) {
 
       // If affiliateId and clientId are present, update the client record
       if (affiliateId && clientId) {
-          const clientDocRef = doc(db, "affiliates", affiliateId, "clients", clientId);
+          const clientDocRef = doc(adminDB, "affiliates", affiliateId, "clients", clientId);
           await setDoc(clientDocRef, updateData, { merge: true });
           console.log(`Successfully processed checkout for affiliate client: ${clientId}. Total credits added: ${totalCreditsToAdd}`);
 
-      } else if (firebaseUID) {
+      } else {
           // Otherwise, update the main user record
-          const userDocRef = doc(db, "users", firebaseUID);
+          const userDocRef = doc(adminDB, "users", firebaseUID);
           await updateDoc(userDocRef, updateData);
           console.log(`Successfully processed checkout for user: ${firebaseUID}. Total credits added: ${totalCreditsToAdd}`);
       }

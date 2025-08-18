@@ -2,16 +2,15 @@
 'use server';
 
 import {NextResponse, NextRequest} from 'next/server';
-import {auth as adminAuth} from '@/lib/firebase/server';
+import {auth as adminAuth, adminDB} from '@/lib/firebase/server';
 import {stripe} from '@/lib/stripe';
 import {headers} from 'next/headers';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/server'; // Use server-side db
 import { coupons } from '@/lib/coupons';
 import type Stripe from 'stripe';
 
 const getStripeCustomerId = async (firebaseUID: string, email?: string): Promise<string> => {
-    const userDocRef = doc(db, 'users', firebaseUID);
+    const userDocRef = doc(adminDB, 'users', firebaseUID);
     const userDocSnap = await getDoc(userDocRef);
 
     if (userDocSnap.exists() && userDocSnap.data().stripeCustomerId) {
