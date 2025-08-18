@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import type { Stripe } from 'stripe';
 import { doc, updateDoc, serverTimestamp, increment, runTransaction, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { db } from "@/lib/firebase/server"; // Correctly import server-side db
 
 // Helper to determine credits to add from line items
 const getCreditsFromLineItems = (lineItems: Stripe.LineItem[]): number => {

@@ -1,13 +1,14 @@
 
-import { initializeApp, getApp, getApps, App, applicationDefault } from 'firebase-admin/app';
+import { initializeApp, getApp, getApps, App, applicationDefault, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { credential } from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+import { serviceAccount } from './service-account';
 
 let app: App;
 
 if (getApps().length === 0) {
   app = initializeApp({
-    credential: applicationDefault(),
+    credential: cert(serviceAccount),
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
 } else {
@@ -15,3 +16,4 @@ if (getApps().length === 0) {
 }
 
 export const auth = getAuth(app);
+export const db = getFirestore(app);

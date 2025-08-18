@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { generateCreditDisputeLetter, GenerateCreditDisputeLetterInputSchema } from '@/ai/flows/dispute-letter-generator';
 import { auth as adminAuth } from '@/lib/firebase/server';
 import { doc, runTransaction, serverTimestamp, collection, addDoc, increment } from 'firebase/firestore';
-import { db } from '@/lib/firebase/client';
+import { db } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
