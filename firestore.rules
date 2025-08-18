@@ -1,51 +1,17 @@
 rules_version = '2';
-
-service firebase.storage {
-  match /b/{bucket}/o {
-    // Allow users to read and write to their own reports directory
-    match /reports/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Allow affiliates to manage their clients' documents
-    match /affiliateClients/{affiliateId}/{clientId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == affiliateId;
-    }
-  }
-}
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read/write their own document
     match /users/{userId} {
-      allow read, update, write: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null;
+      allow read, write: if request.auth.uid == userId;
     }
-    // Users can read/write their own reports
-    match /reports/{reportId} {
-      allow read, write: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+     match /affiliates/{affiliateId}/{document=**} {
+      allow read, write: if request.auth.uid == affiliateId;
     }
-    // Users can read/write their own letters
-     match /letters/{letterId} {
-      allow read, write: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+     match /reports/{userId}/{document=**} {
+      allow read, write: if request.auth.uid == userId;
     }
-    // Public read for credit boosters
-    match /creditBoosters/{boosterId} {
-      allow read: if true;
-    }
-    // Affiliates can manage their own data
-    match /affiliates/{affiliateId} {
-        allow read, write: if request.auth != null && request.auth.uid == affiliateId;
-    }
-    // Affiliates can manage their own clients
-    match /affiliates/{affiliateId}/clients/{clientId} {
-        allow read, write: if request.auth != null && request.auth.uid == affiliateId;
-    }
-     // Anyone can read leaderboard stats
-    match /affiliateStats/{statId} {
-        allow read: if true;
-    }
+     match /letters/{userId}/{document=**} {
+        allow read, write: if request.auth.uid == userId;
+     }
   }
 }

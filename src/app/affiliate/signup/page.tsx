@@ -1,7 +1,14 @@
-"use client";
 
-import { useState, Suspense } from "react";
-import { Button } from "@/components/ui/button";
+'use client';
+
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
+import { auth, provider, db } from '@/lib/firebase/client';
+
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -9,16 +16,12 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { auth } from "@/lib/firebase/client";
-import { signInWithCustomToken } from "firebase/auth";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
+
+import { useToast } from '@/hooks/use-toast';
 
 // This is the main page component that renders the Suspense boundary
 export default function AffiliateSignupPage() {
@@ -29,50 +32,69 @@ export default function AffiliateSignupPage() {
   );
 }
 
-// This component contains the actual signup form and logic using client hooks
 function AffiliateSignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState(searchParams.get("ref") || "");
   const [loading, setLoading] = useState(false);
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setLoading(true);
-
     try {
-      const functions = getFunctions();
-      const createAffiliate = httpsCallable(functions, "createAffiliate");
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
 
-      const result: any = await createAffiliate({
-        name,
-        email,
-        password,
-        referralCode: referralCode || null,
-      });
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
 
-      if (result.data.error) {
-        throw new Error(result.data.error);
+      if (!userSnap.exists()) {
+        // New user
+        await setDoc(userRef, {
+          uid: user.uid,
+          name: user.displayName || '',
+          email: user.email,
+          createdAt: serverTimestamp(),
+          credits: 1, // Welcome credit
+          subscription: { plan: 'starter', status: 'active' },
+          roles: ['affiliate']
+        });
+        toast({
+          title: 'Account created!',
+          description: 'Welcome to Credit Clarity AI.',
+        });
+
+        // Handle referral if code is present
+        if (referralCode) {
+            const referrerRef = doc(db, "users", referralCode);
+            const referrerSnap = await getDoc(referrerRef);
+            if (referrerSnap.exists()) {
+                await updateDoc(referrerRef, {
+                    referrals: arrayUnion(user.uid),
+                    credits: increment(1) // Bonus for referrer
+                });
+            }
+        }
+
+      } else {
+         // Existing user, ensure they have affiliate role
+         await updateDoc(userRef, {
+            roles: arrayUnion('affiliate')
+         });
+         toast({
+            title: 'Signed in successfully!',
+            description: 'Your account is now enabled for affiliate access.',
+        });
       }
 
-      await signInWithCustomToken(auth, result.data.token);
-
-      toast({
-        title: "Affiliate Account Created!",
-        description: "Welcome! You're now ready to start.",
-      });
-
-      router.push("/affiliate");
+      router.push('/affiliate');
     } catch (error: any) {
+      console.error('Google Sign-In Error:', error);
       toast({
-        variant: "destructive",
-        title: "Signup Failed",
-        description: error.message || "An unexpected error occurred.",
+        variant: 'destructive',
+        title: 'Sign-in Failed',
+        description: error.message || 'An unexpected error occurred.',
       });
     } finally {
       setLoading(false);
@@ -82,66 +104,37 @@ function AffiliateSignupContent() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gradient-to-br from-background to-blue-100 dark:from-background dark:to-blue-950/20">
       <Card className="w-full max-w-md shadow-2xl border-0">
-        <form onSubmit={handleSubmit}>
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-headline font-bold text-primary">
-              Become an Affiliate
-            </CardTitle>
-            <CardDescription className="font-body">
-              Join our network and start earning commissions today.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="referral">Referral Code (Optional)</Label>
-              <Input
-                id="referral"
-                value={referralCode}
-                onChange={(e) => setReferralCode(e.target.value)}
-              />
-            </div>
-            <Button type="submit" className="w-full font-bold" disabled={loading}>
-              {loading ? <Loader2 className="animate-spin" /> : "Create Account"}
-            </Button>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/login" className="font-medium text-primary hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-headline font-bold text-primary">
+            Join Credit Clarity AI
+          </CardTitle>
+          <CardDescription className="font-body">
+            Sign up to access your personal credit analysis tool for free.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="referral">Referral Code (Optional)</Label>
+            <Input
+              id="referral"
+              value={referralCode}
+              onChange={(e) => setReferralCode(e.target.value)}
+              placeholder="Enter referral code"
+            />
+          </div>
+
+          <Button onClick={handleGoogleSignIn} className="w-full font-bold" disabled={loading}>
+            {loading ? <Loader2 className="animate-spin" /> : 'Continue with Google'}
+          </Button>
+        </CardContent>
+        <CardFooter className="flex justify-center">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </CardFooter>
       </Card>
     </div>
   );
