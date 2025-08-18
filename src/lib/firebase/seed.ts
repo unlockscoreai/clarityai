@@ -1,11 +1,14 @@
 
 import * as admin from 'firebase-admin';
-import { serviceAccount } from './service-account'; // Using service account for admin access
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+        credential: admin.credential.cert({
+            projectId: process.env.PROJECT_ID,
+            clientEmail: process.env.CLIENT_EMAIL,
+            privateKey: process.env.PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        }),
     });
 }
 

@@ -25,13 +25,9 @@ const getCreditsFromLineItems = (lineItems: Stripe.LineItem[]): number => {
 }
 
 const getCreditsFromCoupon = (session: Stripe.Checkout.Session): number => {
-    if (session.total_details?.amount_discounted && session.discounts?.length) {
-      for (const discount of session.discounts) {
-          // Ensure discount.coupon is not a string ID
-          if (typeof discount.coupon !== 'string' && discount.coupon?.metadata?.credits) {
-              return parseInt(discount.coupon.metadata.credits, 10);
-          }
-      }
+    const coupon = session.discount?.coupon;
+    if (coupon && coupon.metadata && coupon.metadata.credits) {
+        return parseInt(coupon.metadata.credits, 10);
     }
     return 0;
 }
@@ -56,21 +52,22 @@ export async function POST(req: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const { firebaseUID, stripeCustomerId, plan, affiliateId, clientId } = session.metadata || {};
-
-    if (!firebaseUID && !clientId) {
-      console.error("Webhook Error: No firebaseUID or clientId in session metadata.");
-      return NextResponse.json({ error: 'Missing user or client ID' }, { status: 400 });
+    
+    if (!session.metadata?.firebaseUID) {
+      console.error("Webhook Error: No firebaseUID in session metadata.");
+      return NextResponse.json({ error: 'Missing user ID' }, { status: 400 });
     }
 
     try {
-      // Retrieve line items to determine what was purchased
       const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { expand: ['data.price.product'] });
+      const expandedSession = await stripe.checkout.sessions.retrieve(session.id, { expand: ['discount.coupon'] });
       
       const creditsFromPurchase = getCreditsFromLineItems(lineItems.data);
-      const creditsFromCoupon = getCreditsFromCoupon(session);
+      const creditsFromCoupon = getCreditsFromCoupon(expandedSession);
       const totalCreditsToAdd = creditsFromPurchase + creditsFromCoupon;
       
+      const { firebaseUID, stripeCustomerId, plan, affiliateId, clientId } = session.metadata;
+
       const updateData: { [key: string]: any } = {
           updatedAt: serverTimestamp()
       };

@@ -9,47 +9,44 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
 });
 
-async function createCoupons() {
-  console.log('Creating Stripe coupons...');
+// A map of coupon names to their credit values
+const couponsToCreate = {
+    'VIPFREE': { percent_off: 100, credits: 3, name: 'VIP First Month Free + 3 Credits' },
+    'HALF50': { percent_off: 50, credits: 2, name: '50% Off Subscription + 2 Credits' },
+    'SAVE20': { percent_off: 20, credits: 1, name: '20% Off Subscription + 1 Credit' }
+};
+
+
+async function createOrUpdateCoupons() {
+  console.log('Syncing Stripe coupons...');
+  
   try {
-    // VIP: First month free + 3 credits
-    const vipCoupon = await stripe.coupons.create({
-      name: 'VIP First Month Free + 3 Credits',
-      percent_off: 100,
-      duration: 'once',
-      metadata: {
-        credits: '3',
-      },
-    });
-    console.log('Created VIP Coupon:', vipCoupon.id);
+    const existingCoupons = await stripe.coupons.list({ limit: 100 });
 
-    // 50% off + 2 credits
-    const halfOffCoupon = await stripe.coupons.create({
-      name: '50% Off Subscription + 2 Credits',
-      percent_off: 50,
-      duration: 'once',
-      metadata: {
-        credits: '2',
-      },
-    });
-    console.log('Created 50% Off Coupon:', halfOffCoupon.id);
+    for (const [code, details] of Object.entries(couponsToCreate)) {
+        const existingCoupon = existingCoupons.data.find(c => c.name === details.name);
 
-    // 20% off + 1 credit
-    const twentyOffCoupon = await stripe.coupons.create({
-      name: '20% Off Subscription + 1 Credit',
-      percent_off: 20,
-      duration: 'once',
-      metadata: {
-        credits: '1',
-      },
-    });
-    console.log('Created 20% Off Coupon:', twentyOffCoupon.id);
-
-    console.log('Successfully created all coupons.');
+        if (existingCoupon) {
+            // Optionally update existing coupons if needed, for now we just log it
+            console.log(`Coupon "${details.name}" already exists with ID: ${existingCoupon.id}. Skipping creation.`);
+        } else {
+            const coupon = await stripe.coupons.create({
+                name: details.name,
+                percent_off: details.percent_off,
+                duration: 'once',
+                id: code, // Use the code as the coupon ID for easy lookup
+                metadata: {
+                    credits: details.credits.toString(),
+                },
+            });
+            console.log(`Created coupon "${coupon.name}" with ID: ${coupon.id}`);
+        }
+    }
+     console.log('Successfully synced all coupons.');
 
   } catch (err) {
     console.error('Error creating coupons:', err);
   }
 }
 
-createCoupons();
+createOrUpdateCoupons();
