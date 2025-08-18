@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendEmailVerification, updateProfile } from 'firebase/auth';
+import { getAuth, isSignInWithEmailLink, signInWithEmailLink, sendEmailVerification, updateProfile, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
@@ -21,20 +21,16 @@ export default function FinishSignUpPage() {
     const url = window.location.href;
 
     if (!isSignInWithEmailLink(auth, url)) {
-        // This is not a sign-in link, maybe a direct navigation.
-        // Or could be an existing user from Google Sign In.
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // User is signed in, check if they have a DB record.
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDoc = await getDoc(userDocRef);
                 if (!userDoc.exists()) {
-                    // New user from Google Sign-In, create their record.
                     await setDoc(userDocRef, {
                         fullName: user.displayName,
                         email: user.email,
                         subscription: { plan: 'starter', status: 'active', stripeSessionId: null },
-                        credits: 1, // Welcome credit
+                        credits: 1, 
                         createdAt: serverTimestamp()
                     });
                     toast({ title: "Account Created!", description: "Welcome to Credit Clarity AI." });
@@ -42,7 +38,6 @@ export default function FinishSignUpPage() {
                 setMessage('Redirecting to your dashboard...');
                 router.push('/dashboard');
             } else {
-                // No user and no magic link, redirect to login.
                 setMessage('Invalid link or session. Redirecting to login...');
                 router.push('/login');
             }
@@ -50,7 +45,6 @@ export default function FinishSignUpPage() {
         return;
     }
 
-    // It is a sign-in link, process it.
     let email = window.localStorage.getItem('emailForSignIn');
     if (!email) {
       email = window.prompt('Please provide your email for confirmation');
@@ -117,8 +111,7 @@ export default function FinishSignUpPage() {
         toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
         router.push('/login');
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, toast]);
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background">

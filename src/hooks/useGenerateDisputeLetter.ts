@@ -42,7 +42,7 @@ export function useGenerateDisputeLetter(): UseGenerateDisputeLetterReturn {
       setLetter(data);
       toast({
         title: "Dispute Package Generated!",
-        description: `Your documents have been created successfully.`,
+        description: `Your documents have been created and 1 credit has been deducted.`,
       });
       return data;
 
