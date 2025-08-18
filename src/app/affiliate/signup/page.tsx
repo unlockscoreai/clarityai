@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,7 +20,17 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { auth } from "@/lib/firebase/client";
 import { signInWithCustomToken } from "firebase/auth";
 
+// This is the main page component that renders the Suspense boundary
 export default function AffiliateSignupPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AffiliateSignupContent />
+    </Suspense>
+  );
+}
+
+// This component contains the actual signup form and logic using client hooks
+function AffiliateSignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -29,7 +38,7 @@ export default function AffiliateSignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || "");
+  const [referralCode, setReferralCode] = useState(searchParams.get("ref") || "");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -38,8 +47,8 @@ export default function AffiliateSignupPage() {
 
     try {
       const functions = getFunctions();
-      const createAffiliate = httpsCallable(functions, 'createAffiliate');
-      
+      const createAffiliate = httpsCallable(functions, "createAffiliate");
+
       const result: any = await createAffiliate({
         name,
         email,
@@ -50,8 +59,7 @@ export default function AffiliateSignupPage() {
       if (result.data.error) {
         throw new Error(result.data.error);
       }
-      
-      // Sign in the user with the custom token returned from the function
+
       await signInWithCustomToken(auth, result.data.token);
 
       toast({
@@ -59,8 +67,7 @@ export default function AffiliateSignupPage() {
         description: "Welcome! You're now ready to start.",
       });
 
-      router.push('/affiliate');
-
+      router.push("/affiliate");
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -87,19 +94,40 @@ export default function AffiliateSignupPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+              <Input
+                id="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
-             <div className="space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="referral">Referral Code (Optional)</Label>
-              <Input id="referral" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+              <Input
+                id="referral"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+              />
             </div>
             <Button type="submit" className="w-full font-bold" disabled={loading}>
               {loading ? <Loader2 className="animate-spin" /> : "Create Account"}
