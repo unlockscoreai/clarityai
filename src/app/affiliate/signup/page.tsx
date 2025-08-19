@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
+import AuthButtons from '@/components/auth/AuthButtons';
 
 // This is the main page component that renders the Suspense boundary
 export default function AffiliateSignupPage() {
@@ -107,10 +108,10 @@ function AffiliateSignupContent() {
       <Card className="w-full max-w-md shadow-2xl border-0">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-headline font-bold text-primary">
-            Join Credit Clarity AI
+            Join the Affiliate Program
           </CardTitle>
           <CardDescription className="font-body">
-            Sign up to access your personal credit analysis tool for free.
+            Sign up or sign in to become an affiliate partner.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -123,17 +124,15 @@ function AffiliateSignupContent() {
               placeholder="Enter referral code"
             />
           </div>
-
-          <Button onClick={handleGoogleSignIn} className="w-full font-bold" disabled={loading}>
-            {loading ? <Loader2 className="animate-spin" /> : 'Continue with Google'}
-          </Button>
+          <AuthButtons />
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign in
+            By signing up, you agree to our{' '}
+            <Link href="#" className="font-medium text-primary hover:underline">
+              Affiliate Terms
             </Link>
+            .
           </p>
         </CardFooter>
       </Card>
