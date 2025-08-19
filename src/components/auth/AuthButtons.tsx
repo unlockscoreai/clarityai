@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -15,7 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const actionCodeSettings = {
-  url: `${process.env.NEXT_PUBLIC_APP_URL}/finish-signup`,
+  url: 'http://localhost:9002/finish-signup',
   handleCodeInApp: true,
 };
 
