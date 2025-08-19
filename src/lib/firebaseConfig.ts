@@ -1,4 +1,3 @@
-
 // This utility is needed to avoid "window is not defined" error during server-side rendering,
 // and to dynamically set the redirect URL based on the environment.
 
@@ -9,10 +8,8 @@
  * In a server-side or build environment, it falls back to the NEXT_PUBLIC_APP_URL.
  */
 export const getActionCodeSettings = () => {
-    const isBrowser = typeof window !== "undefined";
-    const url = isBrowser 
-        ? `${window.location.origin}/finish-signup`
-        : `${process.env.NEXT_PUBLIC_APP_URL}/finish-signup`;
+    // This URL must be whitelisted in the Firebase Console.
+    const url = `${process.env.NEXT_PUBLIC_APP_URL}/finish-signup`;
 
     return {
         url: url,
