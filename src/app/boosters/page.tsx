@@ -34,42 +34,35 @@ type KeyMetric = {
 
 // This function derives key metrics from the detailed analysis.
 // In a real scenario, this logic might be more complex or part of the AI output itself.
-const deriveKeyMetrics = (analysis: AnalyzeCreditProfileOutput): KeyMetric[] => {
+const deriveKeyMetrics = (analysis: AnalyzeCreditProfileOutput | null): KeyMetric[] => {
+    if (!analysis || !analysis.actionItems) return [];
+    
     const metrics: KeyMetric[] = [];
-
-    const utilizationFactor = analysis.factors.find(f => f.title.toLowerCase().includes('utilization'));
-    if (utilizationFactor) {
-        const match = utilizationFactor.description.match(/(\d+)%/);
+    
+    // Heuristic: Use action items to derive metrics. A more robust solution would be to have the AI return structured factors.
+    const utilizationItem = analysis.actionItems.find(item => item.toLowerCase().includes('utilization'));
+    if (utilizationItem) {
+        const match = utilizationItem.match(/(\d+)%/);
         metrics.push({
             label: "Credit Utilization",
-            value: match ? `${match[1]}%` : "N/A",
+            value: match ? `${match[1]}%` : "High",
             recommendation: "Below 30% for optimal score boost"
         });
     }
 
-    const inquiriesFactor = analysis.factors.find(f => f.title.toLowerCase().includes('inquiries'));
-    if (inquiriesFactor) {
-         const match = inquiriesFactor.description.match(/(\d+)/);
+    const inquiriesItem = analysis.actionItems.find(item => item.toLowerCase().includes('inquiries'));
+    if (inquiriesItem) {
+         const match = inquiriesItem.match(/(\d+)/);
         metrics.push({
-            label: "Hard Inquiries (12mo)",
-            value: match ? match[1] : "N/A",
+            label: "Hard Inquiries",
+            value: match ? match[1] : "High",
             recommendation: "Avoid new credit for 6-12 months"
         });
     }
     
-    const ageFactor = analysis.factors.find(f => f.title.toLowerCase().includes('age'));
-     if (ageFactor) {
-        const match = ageFactor.description.match(/(\d+\s*year)/);
-        metrics.push({
-            label: "Oldest Account",
-            value: match ? match[0] : "N/A",
-            recommendation: "Longer history = higher score over time"
-        });
-    }
-    
-    const mixFactor = analysis.factors.find(f => f.title.toLowerCase().includes('mix'));
-    if (mixFactor) {
-        const hasInstallment = !mixFactor.description.toLowerCase().includes('no installment');
+    const mixItem = analysis.actionItems.find(item => item.toLowerCase().includes('credit mix'));
+    if (mixItem) {
+        const hasInstallment = !mixItem.toLowerCase().includes('add an installment');
         metrics.push({
             label: "Installment Loans",
             value: hasInstallment ? "Present" : "None",
@@ -77,7 +70,7 @@ const deriveKeyMetrics = (analysis: AnalyzeCreditProfileOutput): KeyMetric[] => 
         });
     }
 
-    return metrics;
+    return metrics.slice(0, 4); // Return max 4 metrics
 };
 
 
@@ -133,7 +126,7 @@ export default function CreditBoostersPage() {
     <AppLayout>
       <div className="space-y-6">
         {/* Summary & AI Insights */}
-        {analysis && (
+        {analysis && keyMetrics.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="font-headline flex items-center gap-2">
@@ -235,5 +228,3 @@ export default function CreditBoostersPage() {
     </AppLayout>
   );
 }
-
-    
