@@ -24,7 +24,7 @@ export default function CreditReportAnalysis({ analysis }: { analysis: AnalyzeCr
         </CardHeader>
         <CardContent className="space-y-6">
           <Alert>
-            <AlertTitle>Analysis Summary</AlertTitle>
+            <AlertTitle className="font-semibold">Analysis Summary</AlertTitle>
             <AlertDescription>{analysis.summary}</AlertDescription>
           </Alert>
 
@@ -55,7 +55,7 @@ export default function CreditReportAnalysis({ analysis }: { analysis: AnalyzeCr
           </CardHeader>
           <CardContent className="space-y-4">
             {analysis.disputableItems.map((item, index) => (
-              <div key={index} className="p-4 border rounded-lg">
+              <div key={index} className="p-4 border rounded-lg bg-secondary/50">
                 <p className="font-semibold">{item.item}</p>
                 <p className="text-sm text-muted-foreground mt-1">{item.reason}</p>
                 <p className="text-sm font-bold text-primary mt-2">
@@ -63,7 +63,7 @@ export default function CreditReportAnalysis({ analysis }: { analysis: AnalyzeCr
                 </p>
               </div>
             ))}
-             <Button asChild className="mt-4">
+             <Button asChild className="mt-4 font-bold">
               <Link href="/letters">
                   Go to Letter Center <ArrowUpRight className="ml-2"/>
               </Link>
