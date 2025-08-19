@@ -1,14 +1,14 @@
 
 "use client";
 
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
+import { auth } from "@/lib/firebase/client"; // Use the client-safe auth instance
 
-const auth = getAuth(); // Top-level stable auth instance
 const provider = new GoogleAuthProvider();
 
 function GoogleIcon() {
@@ -31,19 +31,38 @@ export default function SignupForm() {
 
     try {
       // Sign in with Google popup
-      const result = await signInWithPopup(auth, provider);
-      // Optional: const user = result.user;
+      await signInWithPopup(auth, provider);
 
       // Redirect to finish signup page after successful authentication
+      // This page will handle creating the user document in Firestore.
       router.push("/finish-signup");
     } catch (err: unknown) {
-      // Safe error handling
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : "An unexpected error occurred";
+      // Safe error handling with specific Firebase error codes
+      let errorMessage = "An unexpected error occurred.";
+      if (err instanceof Error) {
+        // Check if it's a Firebase Auth error
+        if ((err as any).code) {
+          switch ((err as any).code) {
+            case 'auth/popup-closed-by-user':
+              errorMessage = "You closed the Google sign-in window. Please try again.";
+              break;
+            case 'auth/cancelled-popup-request':
+              errorMessage = "Sign-in cancelled. Another sign-in request is already in progress.";
+              break;
+            case 'auth/account-exists-with-different-credential':
+                errorMessage = "An account already exists with this email. Please sign in using the original method."
+                break;
+            default:
+              errorMessage = `Sign-up failed: ${err.message} (Code: ${(err as any).code})`;
+              break;
+          }
+        } else {
+          errorMessage = err.message;
+        }
+      } else if (typeof err === "string") {
+        errorMessage = err;
+      }
+
 
       console.error("Google Signup Error:", errorMessage);
       toast({
