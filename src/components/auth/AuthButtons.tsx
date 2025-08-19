@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { actionCodeSettings } from '@/lib/firebaseConfig';
+
 
 function GoogleIcon() {
     return (
@@ -57,23 +59,6 @@ export default function AuthButtons() {
         return;
       }
       
-      const getRedirectUrl = () => {
-        if (typeof window !== 'undefined') {
-            if (window.location.hostname === "localhost") {
-                return `${window.location.origin}/finish-signup`;
-            } else {
-                return `${process.env.NEXT_PUBLIC_PRODUCTION_URL}/finish-signup`;
-            }
-        }
-        // Default fallback for server-side or unknown environments
-        return `${process.env.NEXT_PUBLIC_PRODUCTION_URL}/finish-signup`;
-      };
-      
-      const actionCodeSettings = {
-        url: getRedirectUrl(),
-        handleCodeInApp: true,
-      };
-
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
       window.localStorage.setItem('emailForSignIn', email);
       toast({ title: 'Magic link sent', description: 'Check your inbox to sign in.' });
