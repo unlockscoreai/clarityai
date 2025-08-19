@@ -1,10 +1,11 @@
+
 // This file is gitignored. Fill in with your Firebase project's client-side configuration.
 // Go to Project Settings > General in the Firebase console to find these values.
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  "projectId": "credit-clarity-ai-3xl8s",
+  "appId": "1:925810683734:web:d0910772d7671868d4b0f7",
+  "storageBucket": "credit-clarity-ai-3xl8s.appspot.com",
+  "apiKey": "AIzaSyAas1vTLl8pq5eYuBiyg1Db-l6Nq2YplPQ",
+  "authDomain": "credit-clarity-ai-3xl8s.firebaseapp.com",
+  "messagingSenderId": "925810683734"
 };
