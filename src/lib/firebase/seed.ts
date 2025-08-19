@@ -71,6 +71,11 @@ const affiliateStats = [
     }
 ];
 
+const demoClients = [
+    { name: "Alice Johnson", email: "alice@example.com", address: "123 Maple St", status: "pending_analysis", earnings: 0 },
+    { name: "Bob Williams", email: "bob@example.com", address: "456 Oak Ave", status: "complete", earnings: 150 },
+    { name: "Charlie Brown", email: "charlie@example.com", address: "789 Pine Ln", status: "letters_delivered", earnings: 75 },
+]
 
 async function seedDatabase() {
     console.log('Starting to seed the database...');
@@ -92,6 +97,54 @@ async function seedDatabase() {
         batch.set(docRef, statData);
     });
     console.log(`${affiliateStats.length} affiliate stats prepared for seeding.`);
+    
+    // Seed Demo User Data
+    try {
+        const demoUserRecord = await admin.auth().getUserByEmail("demo@example.com");
+        const demoUid = demoUserRecord.uid;
+        
+        // 1. Create user doc
+        const userDocRef = db.collection('users').doc(demoUid);
+        batch.set(userDocRef, {
+            uid: demoUid,
+            name: "Demo User",
+            email: "demo@example.com",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            credits: 5,
+            subscription: { plan: 'pro', status: 'active' },
+            roles: ['affiliate']
+        });
+
+        // 2. Create affiliate doc
+        const affiliateDocRef = db.collection('affiliates').doc(demoUid);
+        batch.set(affiliateDocRef, {
+            name: "Demo User Inc.",
+            userId: demoUid,
+            status: "Active",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        
+        // 3. Create mock clients for the demo affiliate
+        const clientsColRef = db.collection('affiliates').doc(demoUid).collection('clients');
+        demoClients.forEach(client => {
+            const clientDocRef = clientsColRef.doc();
+            batch.set(clientDocRef, {
+                ...client,
+                affiliateId: demoUid,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        });
+
+        console.log(`Prepared demo data for user ${demoUid}`);
+
+    } catch (error: any) {
+        if (error.code === 'auth/user-not-found') {
+            console.warn("Demo user 'demo@example.com' not found in Firebase Auth. Skipping demo data seeding.");
+            console.warn("Please create the demo user in the Firebase console to seed their data.");
+        } else {
+            console.error("Error preparing demo user data:", error);
+        }
+    }
 
 
     try {
