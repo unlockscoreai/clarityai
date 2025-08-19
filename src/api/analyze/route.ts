@@ -1,20 +1,18 @@
 
 'use server';
 
+import { config } from 'dotenv';
+config();
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
-import { getStorage } from 'firebase-admin/storage';
 import { auth as adminAuth } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.split('Bearer ')[1];
     
-    // During signup, a token might not be available yet.
-    // In a production app, this endpoint should be protected,
-    // e.g., with App Check or a temporary captcha-verified token.
-    // For this flow, we'll proceed if no token is provided.
     let userId = 'anonymous_signup'; // Default user for initial analysis
     if (token) {
         const decodedToken = await adminAuth.verifyIdToken(token);
@@ -33,29 +31,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     }
 
-    // Upload file to Firebase Storage
-    const storage = getStorage();
-    const bucketName = process.env.FIREBASE_STORAGE_BUCKET || 'credit-clarity-ai-3xl8s.appspot.com';
-    const bucket = storage.bucket(bucketName);
-    const filePath = `reports/${userId}/${Date.now()}-${file.name}`;
-    const fileRef = bucket.file(filePath);
-    
+    // Convert file to a data URI
     const fileBuffer = await file.arrayBuffer();
-    await fileRef.save(Buffer.from(fileBuffer), {
-        contentType: file.type
-    });
-
-    const gsUri = `gs://${bucket.name}/${filePath}`;
+    const base64String = Buffer.from(fileBuffer).toString('base64');
+    const dataUri = `data:${file.type};base64,${base64String}`;
 
     const input = {
-      creditReportGsUri: gsUri,
+      creditReportDataUri: dataUri,
     };
 
     const response = await analyzeCreditProfile(input);
     
     return NextResponse.json(response);
 
-  } catch (err: any) {
+  } catch (err: any) => {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input.', details: err.format() }, { status: 400 });
     }

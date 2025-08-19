@@ -1,38 +1,54 @@
 
 'use server';
 /**
- * @fileOverview Analyzes a credit report against a checklist for a high Unlock Score.
+ * @fileOverview Enhanced credit report analysis flow for Unlock Score.
  */
 
-import { z } from 'genkit';
 import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+
+// ------------------------------
+// Input / Output Schemas
+// ------------------------------
 
 const AnalyzeCreditProfileInputSchema = z.object({
-  creditReportGsUri: z
+  creditReportDataUri: z
     .string()
     .describe(
-      "The Google Cloud Storage URI of the credit report file. Format: 'gs://<bucket_name>/<path_to_file>'."
+      "A credit report file as a data URI (Base64 encoded with MIME type). Format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
+
 export type AnalyzeCreditProfileInput = z.infer<typeof AnalyzeCreditProfileInputSchema>;
 
-const AnalyzeCreditProfileOutputSchema = z.object({
-  summary: z.string().describe('A brief, encouraging summary of the credit profile.'),
-  factors: z.array(z.object({
-    title: z.string().describe('The name of the credit factor (e.g., "Payment History").'),
-    description: z.string().describe('A description of the user\'s status for this factor.'),
-    impact: z.string().describe('The potential score impact or advice related to this factor (e.g., "+20 points if reduced below 30%").'),
-  })).describe('A breakdown of the analysis by credit factor.'),
-  actionItems: z.array(z.string()).describe('A list of personalized action items to improve the credit profile.'),
-  disputableItems: z.array(
-    z.object({
-      item: z.string().describe('The name of the disputable item from the report.'),
-      reason: z.string().describe('Why this item is likely disputable.'),
-      successProbability: z.number().min(0).max(100).describe('Estimated chance of successful removal, as a percentage.'),
-    })
-  ).describe('Items identified as potentially disputable, with success probability.'),
+const DisputableItemSchema = z.object({
+  item: z.string().describe('The disputable item name'),
+  reason: z.string().describe('Reason it may be disputable'),
+  successProbability: z
+    .number()
+    .min(0)
+    .max(100)
+    .describe('Estimated probability of successful removal'),
 });
+
+const AnalyzeCreditProfileOutputSchema = z.object({
+  summary: z.string().describe('Brief credit profile overview'),
+  actionItems: z.array(z.string()).describe('Concrete steps to improve credit'),
+  disputableItems: z.array(DisputableItemSchema).describe(
+    'Items likely disputable with reasons and success probability'
+  ),
+  unlockScoreProgress: z
+    .number()
+    .min(0)
+    .max(100)
+    .describe('Estimated % toward a high Unlock Score based on checklist')
+});
+
 export type AnalyzeCreditProfileOutput = z.infer<typeof AnalyzeCreditProfileOutputSchema>;
+
+// ------------------------------
+// Checklist
+// ------------------------------
 
 const checklist = `
 Credit Profile Checklist for a High Unlock Score:
@@ -56,56 +72,71 @@ B. Business Credit (if applicable)
 - Clean 3-6 months of business bank statements
 - No recent overdrafts or negative days
 
-C. Supporting Docs for Underwriting
+C. Supporting Docs
 - Driver’s license
 - Proof of address
 - 2 months of paystubs or income
 - Business incorporation docs (if applying for biz credit)
 `;
 
+// ------------------------------
+// AI Prompt
+// ------------------------------
 
 const analyzeCreditProfilePrompt = ai.definePrompt({
-    name: 'analyzeCreditProfilePrompt',
-    input: { schema: AnalyzeCreditProfileInputSchema },
-    output: { schema: AnalyzeCreditProfileOutputSchema },
-    prompt: `You are a professional credit analyst with an encouraging and optimistic tone. Your goal is to empower the user to improve their credit. Analyze the provided credit report PDF and generate a detailed analysis.
+  name: 'analyzeCreditProfilePrompt',
+  input: { schema: AnalyzeCreditProfileInputSchema },
+  output: { schema: AnalyzeCreditProfileOutputSchema },
+  prompt: `
+You are a professional credit analyst. Analyze the credit report and generate:
 
-Checklist for a strong credit profile:
+1. Summary of the credit profile.
+2. Specific, actionable Action Items to meet checklist criteria.
+3. Disputable items with item name, reason, and success probability.
+
+Checklist for reference:
 ${checklist}
 
-Analyze this credit report:
----
-{{media url=creditReportGsUri}}
----
+Credit Report: {{media url=creditReportDataUri}}
 
 Instructions:
-1.  Directly analyze the provided PDF. Parse key metrics.
-2.  Write a concise, encouraging **Summary** of the overall credit profile, highlighting strengths and opportunities.
-3.  Create a **Breakdown by Credit Factor**. For each of the 5 main factors (Payment History, Credit Utilization, Credit Mix, Hard Inquiries, Age of Accounts), provide:
-    -   \`title\`: The name of the factor.
-    -   \`description\`: A clear, simple explanation of the user's status for this factor.
-    -   \`impact\`: A tangible potential score improvement or a clear statement on its effect (e.g., "+20 points if reduced below 30%", "Score impact will decrease over 6-12 months").
-4.  Create a list of concrete, actionable **Action Items** the user can take.
-5.  Identify all negative or potentially incorrect items for the **Disputable Items** list. For each, provide:
-    -   \`item\`: The name of the account or item.
-    -   \`reason\`: A clear, professional reason for the dispute.
-    -   \`successProbability\`: Your expert estimate of the chance of successful removal (0-100).
-
-Your entire output must be in JSON format that strictly adheres to the defined schema.
-`,
+- Compare profile against checklist.
+- Provide Unlock Score progress (% completion of checklist).
+- Output strictly in the JSON format defined.
+`
 });
 
+// ------------------------------
+// Analysis Flow
+// ------------------------------
 
 const analyzeCreditProfileFlow = ai.defineFlow(
   {
     name: 'analyzeCreditProfileFlow',
     inputSchema: AnalyzeCreditProfileInputSchema,
-    outputSchema: AnalyzeCreditProfileOutputSchema,
+    outputSchema: AnalyzeCreditProfileOutputSchema
   },
   async (input) => {
     const { output } = await analyzeCreditProfilePrompt(input);
-    if (!output) throw new Error('AI failed to produce analysis output.');
-    return output;
+    if (!output) {
+      throw new Error('AI failed to produce analysis output.');
+    }
+
+    // Optional: Compute Unlock Score Progress (simple heuristic)
+    const progress = Math.min(
+      100,
+      Math.max(
+        0,
+        Math.round((output.actionItems.length ? 100 - output.actionItems.length * 10 : 100))
+      )
+    );
+    
+    // The prompt doesn't consistently return this, so we compute it here.
+    if ('unlockScoreProgress' in output) {
+        delete output.unlockScoreProgress;
+    }
+
+    return { ...output, unlockScoreProgress: progress };
   }
 );
 
@@ -113,5 +144,9 @@ const analyzeCreditProfileFlow = ai.defineFlow(
 export async function analyzeCreditProfile(
   input: AnalyzeCreditProfileInput
 ): Promise<AnalyzeCreditProfileOutput> {
+  if (!input.creditReportDataUri.startsWith('data:')) {
+    throw new Error('Invalid credit report data URI. Must start with "data:".');
+  }
+
   return analyzeCreditProfileFlow(input);
 }
