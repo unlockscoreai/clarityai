@@ -205,7 +205,7 @@ export default function LettersPage() {
                       You need to analyze a credit report before you can generate a dispute package.
                     </p>
                     <Button asChild>
-                      <Link href="/reports">Analyze Your First Report</Link>
+                      <Link href="/dashboard">Analyze Your First Report</Link>
                     </Button>
                   </div>
                 ) : (
@@ -243,3 +243,5 @@ export default function LettersPage() {
     </AppLayout>
   );
 }
+
+    

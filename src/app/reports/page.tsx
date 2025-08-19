@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Sparkles, ShieldQuestion, FileHeart, CheckCircle, ArrowUpRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSession } from '@/context/session-provider';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,10 +65,6 @@ function AnalysisDisplay({ analysis }: { analysis: AnalyzeCreditProfileOutput })
               ))}
             </div>
           </div>
-
-          <div className="p-4 bg-primary/10 rounded-md text-primary text-center font-medium">
-            🚀 Unlock the full Pro Analysis to see personalized tradeline strategies, dispute letter templates, and projected score impact for each action item.
-          </div>
         </CardContent>
       </Card>
 
@@ -107,105 +104,46 @@ function ReportsPageContent() {
       } catch (e) {
         console.error("Failed to parse analysis data from URL", e);
       }
+    } else if (user) {
+        // If no analysis in URL, fetch the latest one for the user
+        const fetchLatestReport = async () => {
+            setLoading(true);
+            const reportQuery = query(
+                collection(db, "reports"),
+                where("userId", "==", user.uid),
+                orderBy("createdAt", "desc"),
+            );
+            const reportSnap = await getDocs(reportQuery);
+            if (!reportSnap.empty) {
+                setAnalysisResult(reportSnap.docs[0].data() as AnalyzeCreditProfileOutput);
+            }
+            setLoading(false);
+        }
+        fetchLatestReport();
     }
-  }, [searchParams]);
+  }, [searchParams, user]);
 
-  const handleAnalyze = async () => {
-    if (!file) {
-      toast({
-        variant: 'destructive',
-        title: 'No file selected',
-        description: 'Please select a credit report PDF to analyze.',
-      });
-      return;
-    }
-     if (!user) {
-      toast({
-        variant: 'destructive',
-        title: 'Not Authenticated',
-        description: 'You must be logged in to analyze a report.',
-      });
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    setAnalysisResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
-      }
-
-      const result: AnalyzeCreditProfileOutput = await response.json();
-      setAnalysisResult(result);
-
-      // Save the analysis to Firestore
-      const reportsCollectionRef = collection(db, "reports");
-      await addDoc(reportsCollectionRef, {
-          ...result,
-          userId: user.uid,
-          fileName: file.name,
-          createdAt: serverTimestamp(),
-      });
-
-      toast({
-        title: 'Analysis Complete',
-        description: 'Your new report has been analyzed and saved.',
-      });
-
-    } catch (err: any) {
-      console.error(err);
-      setError('Failed to analyze credit report.');
-      toast({
-        variant: 'destructive',
-        title: 'Analysis Failed',
-        description: 'Something went wrong. Please try again or use a different file.',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
       <div className="p-6 max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-4 font-headline">Credit Analysis</h1>
         
-        {!analysisResult && (
-          <>
-            <p className="mb-4 text-muted-foreground">
-              Upload your credit report for an AI-powered deep analysis of your credit profile, 
-              with exact items to dispute and your personalized action plan.
-            </p>
-            <div className="mb-4 space-y-2">
-              <Label htmlFor="reportFile">Upload Report</Label>
-              <Input
-                id="reportFile"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-
-            <Button
-              onClick={handleAnalyze}
-              disabled={!file || loading}
-            >
-              {loading ? <><Loader2 className="mr-2 animate-spin" /> Analyzing...</> : <><Sparkles className="mr-2" />Analyze Report</>}
+        {loading && !analysisResult ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="animate-spin text-primary" />
+          </div>
+        ) : analysisResult ? (
+          <AnalysisDisplay analysis={analysisResult} />
+        ) : (
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-semibold">No analysis found.</h2>
+            <p className="text-muted-foreground mt-2">Get started by analyzing your credit report from the dashboard.</p>
+            <Button asChild className="mt-4">
+              <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
-          </>
+          </div>
         )}
-
-        {error && !analysisResult && <p className="text-destructive mt-4">{error}</p>}
-
-        {analysisResult && <AnalysisDisplay analysis={analysisResult} />}
+        
       </div>
   );
 }
@@ -220,3 +158,5 @@ export default function ReportsPage() {
     </AppLayout>
   )
 }
+
+    

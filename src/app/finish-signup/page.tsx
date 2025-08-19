@@ -73,28 +73,22 @@ export default function FinishSignUpPage() {
         if (isNewUser) {
           setMessage('Welcome! Setting up your account...');
           
-          await updateProfile(user, { displayName: analysis?.fullName || user.displayName });
+          const fullNameFromStorage = window.localStorage.getItem('fullNameForSignIn');
+          window.localStorage.removeItem('fullNameForSignIn');
+
+          await updateProfile(user, { displayName: fullNameFromStorage || user.displayName });
           
           const isTestUser = user.email === 'test@test.com';
           const plan = isTestUser ? 'vip' : 'starter';
           const credits = isTestUser ? 100 : 1;
 
           await setDoc(userDocRef, {
-            fullName: analysis?.fullName || user.displayName,
+            fullName: fullNameFromStorage || user.displayName,
             email: user.email,
             subscription: { plan, status: 'active', stripeSessionId: null },
             credits,
             createdAt: serverTimestamp()
           });
-
-          if (analysis) {
-            const reportsCollectionRef = collection(db, "reports");
-            await addDoc(reportsCollectionRef, {
-                ...analysis,
-                userId: user.uid,
-                createdAt: serverTimestamp(),
-            });
-          }
           
           await sendEmailVerification(user);
 
@@ -122,3 +116,5 @@ export default function FinishSignUpPage() {
     </div>
   );
 }
+
+    
