@@ -38,7 +38,7 @@ const generateCreditDisputeLetterPrompt = ai.definePrompt({
     personalInformation: z.string(), // Pass as stringified JSON
     additionalInstructions: z.string().optional() 
   })},
-  output: { schema: GenerateCreditDisputeLetterOutputSchema },
+  output: { schema: GenerateCreditDisDisputeLetterOutputSchema },
   prompt: `You are a highly skilled credit dispute specialist with deep expertise in the Fair Credit Reporting Act (FCRA). Your task is to analyze a client's credit report and personal information to generate a complete set of dispute letters and related documents.
 
 You will receive a credit report and a JSON object with the client's personal information.

@@ -12,6 +12,7 @@ import { GenerateCreditDisputeLetterInput } from '@/ai/flows/dispute-letter-gene
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
 
 export {
-    analyzeCreditProfile
-};export type { GenerateCreditDisputeLetterInput };
-
+    analyzeCreditProfile,
+    generateCreditDisputeLetter
+};
+export type { GenerateCreditDisputeLetterInput };
