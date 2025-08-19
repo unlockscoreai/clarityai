@@ -21,6 +21,10 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, sendSignInLinkToEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { app } from "@/lib/firebase/client";
+
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 
 type SignupStep = "start" | "email_sent";
 
@@ -61,7 +65,6 @@ export function SignupForm() {
     setLoading(true);
 
     try {
-      const auth = getAuth();
       const actionCodeSettings = {
         url: `${window.location.origin}/finish-signup`,
         handleCodeInApp: true,
@@ -87,8 +90,6 @@ export function SignupForm() {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    const auth = getAuth();
-    const provider = new GoogleAuthProvider();
     try {
         await signInWithPopup(auth, provider);
         router.push('/finish-signup');
