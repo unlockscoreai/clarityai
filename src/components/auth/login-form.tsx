@@ -16,8 +16,6 @@ import Link from "next/link";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, sendSignInLinkToEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
 import { useRouter } from "next/navigation";
 
 const actionCodeSettings = {
@@ -72,31 +70,10 @@ export function LoginForm() {
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
     try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-            // This is a new user, create their document
-             await setDoc(userDocRef, {
-                fullName: user.displayName,
-                email: user.email,
-                subscription: { plan: 'starter', status: 'active', stripeSessionId: null },
-                credits: 1, // Welcome credit
-                createdAt: serverTimestamp()
-            });
-             toast({ title: "Account Created!", description: "Welcome to Credit Clarity AI." });
-        } else {
-             toast({ title: "Signed in Successfully!" });
-        }
-        
-        router.push('/dashboard');
-
+        await signInWithPopup(auth, provider);
+        router.push('/finish-signup');
     } catch (error: any) {
         toast({ variant: "destructive", title: "Google Sign-In Failed", description: error.message });
-    } finally {
         setGoogleLoading(false);
     }
   }
@@ -143,7 +120,7 @@ export function LoginForm() {
                   </div>
                 </div>
 
-                <Button variant="outline" className="w-full font-bold" onClick={handleGoogleSignIn} disabled={loading || googleLoading}>
+                <Button variant="outline" type="button" className="w-full font-bold" onClick={handleGoogleSignIn} disabled={loading || googleLoading}>
                    {googleLoading ? <Loader2 className="animate-spin" /> : <><GoogleIcon /> Sign in with Google</>}
                 </Button>
             </>
@@ -161,5 +138,3 @@ export function LoginForm() {
     </Card>
   );
 }
-
-    

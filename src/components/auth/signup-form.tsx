@@ -21,8 +21,6 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, sendSignInLinkToEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
 
 type SignupStep = "start" | "email_sent";
 
@@ -92,28 +90,10 @@ export function SignupForm() {
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
     try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-             await setDoc(userDocRef, {
-                fullName: user.displayName,
-                email: user.email,
-                subscription: { plan: 'starter', status: 'active', stripeSessionId: null },
-                credits: 1,
-                createdAt: serverTimestamp()
-            });
-             toast({ title: "Account Created!", description: "Welcome to Credit Clarity AI." });
-        }
-        
-        router.push('/dashboard');
-
+        await signInWithPopup(auth, provider);
+        router.push('/finish-signup');
     } catch (error: any) {
         toast({ variant: "destructive", title: "Google Sign-Up Failed", description: error.message });
-    } finally {
         setGoogleLoading(false);
     }
   }
@@ -193,5 +173,3 @@ export function SignupForm() {
     </Card>
   );
 }
-
-    
