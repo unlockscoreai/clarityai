@@ -2,18 +2,20 @@
 "use client";
 
 import { useState } from "react";
-import { sendSignInLinkToEmail, GoogleAuthProvider, signInWithPopup, getAuth } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, sendSignInLinkToEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
-import { auth } from "@/lib/firebase/client";
+import { auth, db } from "@/lib/firebase/client";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { getActionCodeSettings } from "@/lib/firebaseConfig";
 import AuthButtons from "./AuthButtons";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import type { User } from "firebase/auth";
+
+const googleProvider = new GoogleAuthProvider();
 
 export default function SignupForm() {
   const router = useRouter();
@@ -25,18 +27,22 @@ export default function SignupForm() {
 
   const handleGoogleSignup = async () => {
     setLoadingGoogle(true);
-    const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
 
-      if (user) {
-        await setDoc(doc(db, "users", user.uid), {
+      // Create user document in Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          name: user.displayName || '',
           email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          createdAt: new Date(),
-        }, { merge: true });
+          createdAt: serverTimestamp(),
+          credits: 1, // Welcome credit
+          subscription: { plan: 'starter', status: 'active' },
+        });
       }
 
       router.push("/finish-signup");
