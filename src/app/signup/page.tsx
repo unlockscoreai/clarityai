@@ -1,5 +1,4 @@
-
-import AuthButtons from '@/components/auth/AuthButtons';
+import SignupForm from '@/components/auth/signup-form';
 import {
   Card,
   CardContent,
@@ -23,7 +22,7 @@ export default function SignupPage() {
             </CardDescription>
         </CardHeader>
         <CardContent>
-            <AuthButtons />
+            <SignupForm />
         </CardContent>
          <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
