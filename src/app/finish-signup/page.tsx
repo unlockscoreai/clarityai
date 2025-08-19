@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged } from 'firebase/auth';
+import { isSignInWithEmailLink, signInWithEmailLink, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/client';
 import { Loader2 } from 'lucide-react';
@@ -13,13 +13,13 @@ import { Loader2 } from 'lucide-react';
 export default function FinishSignUpPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [message, setMessage] = useState('Verifying your link, please wait...');
+  const [message, setMessage] = useState('Verifying your session, please wait...');
 
   useEffect(() => {
     const url = window.location.href;
 
     // This function handles creating the user doc in Firestore if it doesn't exist.
-    const handleUserCreation = async (user: import('firebase/auth').User) => {
+    const handleUserCreation = async (user: User) => {
         const userDocRef = doc(db, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -46,38 +46,41 @@ export default function FinishSignUpPage() {
         router.push('/dashboard');
     };
 
+    // Case 1: User is signing in with an email link
     if (isSignInWithEmailLink(auth, url)) {
         let email = window.localStorage.getItem('emailForSignIn');
         if (!email) {
+          // This can happen if the user opens the link on a different browser
           email = window.prompt('Please provide your email for confirmation');
         }
 
         if (!email) {
-          toast({ variant: 'destructive', title: 'Verification Failed', description: 'Email address not found.' });
-          router.push('/signup');
+          toast({ variant: 'destructive', title: 'Verification Failed', description: 'Email address not found. Please try signing in again.' });
+          router.push('/login');
           return;
         }
 
+        setMessage('Finalizing email sign in...');
         signInWithEmailLink(auth, email, url)
           .then(async (result) => {
             window.localStorage.removeItem('emailForSignIn');
             await handleUserCreation(result.user);
           })
           .catch((error) => {
-            console.error(error);
+            console.error("Email link sign in error:", error);
             toast({ variant: 'destructive', title: 'Sign In Failed', description: error.message });
             router.push('/login');
           });
     } else {
-        // Handle Google sign-in redirect or if user is already signed in
+        // Case 2: User is returning from Google sign-in or is already logged in
         const unsubscribe = onAuthStateChanged(auth, (user) => {
             if (user) {
                 handleUserCreation(user);
             } else {
-                setMessage('No user session found. Redirecting to login...');
+                setMessage('No user session found. Please sign in.');
                 setTimeout(() => router.push('/login'), 2000);
             }
-            unsubscribe(); // Clean up listener
+            unsubscribe(); // Clean up listener after first check
         });
     }
   }, [router, toast]);

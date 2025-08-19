@@ -13,8 +13,6 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { actionCodeSettings } from '@/lib/firebaseConfig';
-
 
 function GoogleIcon() {
     return (
@@ -25,6 +23,14 @@ function GoogleIcon() {
         </svg>
     )
 }
+
+const getRedirectUrl = () => {
+    if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+        return `${window.location.origin}/finish-signup`;
+    }
+    // Fallback to production URL from environment variables
+    return `${process.env.NEXT_PUBLIC_PROD_URL}/finish-signup`;
+};
 
 
 export default function AuthButtons() {
@@ -56,13 +62,19 @@ export default function AuthButtons() {
     try {
       if (!email) {
         toast({ title: 'Please enter your email address.', variant: 'destructive' });
+        setLoadingEmail(false);
         return;
       }
       
+      const actionCodeSettings = {
+          url: getRedirectUrl(),
+          handleCodeInApp: true,
+      };
+
       await sendSignInLinkToEmail(auth, email, actionCodeSettings);
       window.localStorage.setItem('emailForSignIn', email);
       toast({ title: 'Magic link sent', description: 'Check your inbox to sign in.' });
-    } catch (e: any) {
+    } catch (e: any)      {
       toast({
         title: 'Email link error',
         description: e.message,
