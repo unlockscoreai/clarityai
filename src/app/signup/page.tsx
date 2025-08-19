@@ -1,3 +1,4 @@
+
 import SignupForm from '@/components/auth/signup-form';
 import {
   Card,
@@ -36,3 +37,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
