@@ -1,16 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Each user can only read/write their own profile doc
+
+    // Allow read/write to authenticated users on their own user doc
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Example: reports tied to a user
+    // Example: collection for affiliate referrals
+    match /referrals/{referralId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.ownerUid;
+    }
+    
     match /reports/{reportId} {
-      allow read, write: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
-    // Add per-collection rules as needed…
+    match /letters/{letterId} {
+      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /affiliates/{affiliateId}/{document=**} {
+       allow read, write: if request.auth != null && request.auth.uid == affiliateId;
+    }
+
+    // Publicly readable collections
+    match /creditBoosters/{boosterId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /affiliateStats/{statId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
