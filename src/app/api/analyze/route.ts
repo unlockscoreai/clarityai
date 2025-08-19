@@ -1,6 +1,9 @@
 
 'use server';
 
+import { config } from 'dotenv';
+config();
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
