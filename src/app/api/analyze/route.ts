@@ -14,10 +14,9 @@ export async function POST(req: NextRequest) {
     const token = req.headers.get('authorization')?.split('Bearer ')[1];
     
     // During signup, a token might not be available yet.
-    // In a production app, this endpoint should be protected,
-    // e.g., with App Check or a temporary captcha-verified token.
-    // For this flow, we'll proceed if no token is provided.
-    let userId = 'anonymous_signup'; // Default user for initial analysis
+    // For this flow, we'll proceed if no token is provided,
+    // using a default user ID.
+    let userId = 'anonymous_signup'; 
     if (token) {
         const decodedToken = await adminAuth.verifyIdToken(token);
         userId = decodedToken.uid;
@@ -34,12 +33,13 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     }
-
-    // Upload file to Firebase Storage
-    const bucketName = adminBucket.name;
-    if (!bucketName) {
+    
+    // Throw an error if the bucket name is not configured
+    if (!adminBucket.name) {
         throw new Error("Firebase Storage bucket name is not configured in environment variables.");
     }
+
+    // Upload file to Firebase Storage
     const filePath = `reports/${userId}/${Date.now()}-${file.name}`;
     const fileRef = adminBucket.file(filePath);
     
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         contentType: file.type
     });
 
-    const gsUri = `gs://${bucketName}/${filePath}`;
+    const gsUri = `gs://${adminBucket.name}/${filePath}`;
 
     const input = {
       creditReportGsUri: gsUri,
@@ -56,7 +56,10 @@ export async function POST(req: NextRequest) {
 
     const response = await analyzeCreditProfile(input);
     
-    return NextResponse.json(response);
+    // Attach the gsUri to the response so we can save it in the firestore doc
+    const responseWithUri = { ...response, creditReportDataUri: gsUri };
+
+    return NextResponse.json(responseWithUri);
 
   } catch (err: any) {
     if (err instanceof z.ZodError) {

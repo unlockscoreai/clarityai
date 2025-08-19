@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
   if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+    console.error("Missing Firebase Admin environment variables. Make sure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set.");
     throw new Error("Missing Firebase Admin environment variables.");
   }
 

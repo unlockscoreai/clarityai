@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Enhanced credit report analysis flow for Unlock Score.
@@ -12,10 +11,10 @@ import { z } from 'genkit';
 // ------------------------------
 
 const AnalyzeCreditProfileInputSchema = z.object({
-  creditReportDataUri: z
+  creditReportGsUri: z
     .string()
     .describe(
-      "A credit report file as a data URI (Base64 encoded with MIME type). Format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A credit report file as a Google Cloud Storage URI. Format: 'gs://<bucket>/<path-to-file>'"
     ),
 });
 
@@ -97,7 +96,7 @@ You are a professional credit analyst. Analyze the credit report and generate:
 Checklist for reference:
 ${checklist}
 
-Credit Report: {{media url=creditReportDataUri}}
+Credit Report: {{media url=creditReportGsUri}}
 
 Instructions:
 - Compare profile against checklist.
@@ -133,7 +132,7 @@ const analyzeCreditProfileFlow = ai.defineFlow(
     
     // The prompt doesn't consistently return this, so we compute it here.
     if ('unlockScoreProgress' in output) {
-        delete output.unlockScoreProgress;
+        delete (output as any).unlockScoreProgress;
     }
 
     return { ...output, unlockScoreProgress: progress };
@@ -144,8 +143,8 @@ const analyzeCreditProfileFlow = ai.defineFlow(
 export async function analyzeCreditProfile(
   input: AnalyzeCreditProfileInput
 ): Promise<AnalyzeCreditProfileOutput> {
-  if (!input.creditReportDataUri.startsWith('data:')) {
-    throw new Error('Invalid credit report data URI. Must start with "data:".');
+  if (!input.creditReportGsUri.startsWith('gs://')) {
+    throw new Error('Invalid credit report URI. Must be a gs:// URI.');
   }
 
   return analyzeCreditProfileFlow(input);
