@@ -12,6 +12,13 @@ import { db } from '@/lib/firebase/client';
 import { AppLayout } from '@/components/app-layout';
 import { useSearchParams } from 'next/navigation';
 import CreditReportAnalysis from '@/components/reports/credit-report-analysis';
+import { 
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 function ReportsPageContent() {
   const [loading, setLoading] = useState(true);
