@@ -1,12 +1,11 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -18,7 +17,6 @@ import {
   FileCheck,
   Lock,
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AnalyzeCreditProfileOutput } from '@/ai/flows/credit-report-analyzer';
 import { useToast } from "@/hooks/use-toast";
@@ -28,7 +26,7 @@ import { auth, db } from "@/lib/firebase/client";
 
 type SignupStep = "upload" | "analyzing" | "preview" | "create_account";
 
-export function SignupForm() {
+export default function SignupFlow() {
   const router = useRouter();
   const { toast } = useToast();
 
@@ -82,6 +80,7 @@ export function SignupForm() {
       const formData = new FormData();
       formData.append('file', reportFile);
       
+      // We don't need a token for the initial analysis
       const response = await fetch('/api/analyze', {
         method: 'POST',
         body: formData,
@@ -123,18 +122,18 @@ export function SignupForm() {
 
         // Store user info in Firestore
         await setDoc(doc(db, "users", user.uid), {
-            fullName: fullName,
+            uid: user.uid,
+            name: fullName,
             email: user.email,
             subscription: {
               plan: plan,
               status: 'active',
-              stripeSessionId: null
             },
             credits: credits,
             createdAt: serverTimestamp()
         });
 
-        // Store report in Firestore
+        // Store report in Firestore, linking it to the new user
         if (analysis) {
             const reportsCollectionRef = collection(db, "reports");
             await addDoc(reportsCollectionRef, {
@@ -270,19 +269,19 @@ export function SignupForm() {
                 <form onSubmit={handleCreateAccount}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="fullName">Full Name</Label>
-                            <Input id="fullName" value={fullName} required onChange={e => setFullName(e.target.value)} />
+                            <Label htmlFor="fullNameCreate">Full Name</Label>
+                            <Input id="fullNameCreate" value={fullName} required onChange={e => setFullName(e.target.value)} disabled />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" value={email} required onChange={e => setEmail(e.target.value)} />
+                            <Label htmlFor="emailCreate">Email</Label>
+                            <Input id="emailCreate" type="email" value={email} required onChange={e => setEmail(e.target.value)} disabled />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Password</Label>
-                            <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} />
+                            <Input id="password" type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Create a password" />
                         </div>
                         <Button type="submit" className="w-full font-bold" disabled={loading}>
-                            {loading ? <Loader2 className="animate-spin" /> : "Create Account" }
+                            {loading ? <Loader2 className="animate-spin" /> : "Complete Sign Up" }
                         </Button>
                     </CardContent>
                 </form>
@@ -291,17 +290,5 @@ export function SignupForm() {
     }
   };
 
-  return (
-    <Card className="w-full max-w-lg shadow-2xl border-0">
-      {renderStep()}
-      <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="font-medium text-primary hover:underline">
-              Sign In
-            </Link>
-          </p>
-        </CardFooter>
-    </Card>
-  );
+  return <>{renderStep()}</>;
 }
