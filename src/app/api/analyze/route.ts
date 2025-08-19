@@ -7,8 +7,7 @@ config();
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
-import { getStorage } from 'firebase-admin/storage';
-import { auth as adminAuth } from '@/lib/firebase/server';
+import { auth as adminAuth, adminBucket } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,21 +36,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload file to Firebase Storage
-    const storage = getStorage();
-    const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+    const bucketName = adminBucket.name;
     if (!bucketName) {
         throw new Error("Firebase Storage bucket name is not configured in environment variables.");
     }
-    const bucket = storage.bucket(bucketName);
     const filePath = `reports/${userId}/${Date.now()}-${file.name}`;
-    const fileRef = bucket.file(filePath);
+    const fileRef = adminBucket.file(filePath);
     
     const fileBuffer = await file.arrayBuffer();
     await fileRef.save(Buffer.from(fileBuffer), {
         contentType: file.type
     });
 
-    const gsUri = `gs://${bucket.name}/${filePath}`;
+    const gsUri = `gs://${bucketName}/${filePath}`;
 
     const input = {
       creditReportGsUri: gsUri,
