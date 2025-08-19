@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Enhanced credit report analysis flow for Unlock Score.
@@ -11,10 +12,10 @@ import { z } from 'genkit';
 // ------------------------------
 
 const AnalyzeCreditProfileInputSchema = z.object({
-  creditReportGsUri: z
+  creditReportDataUri: z
     .string()
     .describe(
-      "A credit report file as a Google Cloud Storage URI. Format: 'gs://<bucket>/<path-to-file>'"
+      "A credit report file as a data URI (Base64 encoded with MIME type). Format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 
@@ -96,7 +97,7 @@ You are a professional credit analyst. Analyze the credit report and generate:
 Checklist for reference:
 ${checklist}
 
-Credit Report: {{media url=creditReportGsUri}}
+Credit Report: {{media url=creditReportDataUri}}
 
 Instructions:
 - Compare profile against checklist.
@@ -121,8 +122,8 @@ const analyzeCreditProfileFlow = ai.defineFlow(
       throw new Error('AI failed to produce analysis output.');
     }
 
-    // Optional: Compute Unlock Score Progress (simple heuristic)
-    const progress = Math.min(
+    // The prompt doesn't consistently return this, so we compute it here as a backup.
+    const progress = output.unlockScoreProgress || Math.min(
       100,
       Math.max(
         0,
@@ -130,11 +131,6 @@ const analyzeCreditProfileFlow = ai.defineFlow(
       )
     );
     
-    // The prompt doesn't consistently return this, so we compute it here.
-    if ('unlockScoreProgress' in output) {
-        delete (output as any).unlockScoreProgress;
-    }
-
     return { ...output, unlockScoreProgress: progress };
   }
 );
@@ -143,8 +139,8 @@ const analyzeCreditProfileFlow = ai.defineFlow(
 export async function analyzeCreditProfile(
   input: AnalyzeCreditProfileInput
 ): Promise<AnalyzeCreditProfileOutput> {
-  if (!input.creditReportGsUri.startsWith('gs://')) {
-    throw new Error('Invalid credit report URI. Must be a gs:// URI.');
+  if (!input.creditReportDataUri.startsWith('data:')) {
+    throw new Error('Invalid credit report URI. Must be a data URI.');
   }
 
   return analyzeCreditProfileFlow(input);

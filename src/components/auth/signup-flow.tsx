@@ -87,7 +87,8 @@ export default function SignupFlow() {
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Server returned: ${response.status}`);
       }
 
       const analysisResult: AnalyzeCreditProfileOutput = await response.json();

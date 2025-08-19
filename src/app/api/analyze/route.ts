@@ -7,16 +7,13 @@ config();
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { analyzeCreditProfile } from '@/ai/flows/credit-report-analyzer';
-import { auth as adminAuth, adminBucket } from '@/lib/firebase/server';
+import { auth as adminAuth } from '@/lib/firebase/server';
 
 export async function POST(req: NextRequest) {
   try {
     const token = req.headers.get('authorization')?.split('Bearer ')[1];
     
-    // During signup, a token might not be available yet.
-    // For this flow, we'll proceed if no token is provided,
-    // using a default user ID.
-    let userId = 'anonymous_signup'; 
+    let userId = 'anonymous_signup'; // Default user for initial analysis
     if (token) {
         const decodedToken = await adminAuth.verifyIdToken(token);
         userId = decodedToken.uid;
@@ -33,33 +30,22 @@ export async function POST(req: NextRequest) {
     if (!file) {
       return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
     }
-    
-    // Throw an error if the bucket name is not configured
-    if (!adminBucket.name) {
-        throw new Error("Firebase Storage bucket name is not configured in environment variables.");
-    }
 
-    // Upload file to Firebase Storage
-    const filePath = `reports/${userId}/${Date.now()}-${file.name}`;
-    const fileRef = adminBucket.file(filePath);
-    
+    // Convert file to a data URI
     const fileBuffer = await file.arrayBuffer();
-    await fileRef.save(Buffer.from(fileBuffer), {
-        contentType: file.type
-    });
-
-    const gsUri = `gs://${adminBucket.name}/${filePath}`;
+    const base64String = Buffer.from(fileBuffer).toString('base64');
+    const dataUri = `data:${file.type};base64,${base64String}`;
 
     const input = {
-      creditReportGsUri: gsUri,
+      creditReportDataUri: dataUri,
     };
 
     const response = await analyzeCreditProfile(input);
     
-    // Attach the gsUri to the response so we can save it in the firestore doc
-    const responseWithUri = { ...response, creditReportDataUri: gsUri };
-
-    return NextResponse.json(responseWithUri);
+    // The creditReportDataUri is no longer needed in the response,
+    // as it's not being saved directly anymore.
+    // We only pass the gsUri when we save to storage.
+    return NextResponse.json(response);
 
   } catch (err: any) {
     if (err instanceof z.ZodError) {

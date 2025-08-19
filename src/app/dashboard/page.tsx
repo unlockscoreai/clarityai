@@ -72,7 +72,8 @@ function AnalyzeReportCard() {
             });
 
             if (!response.ok) {
-                throw new Error(`Server returned: ${response.status}: ${await response.text()}`);
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Server returned: ${response.status}`);
             }
 
             const result: AnalyzeCreditProfileOutput = await response.json();
@@ -98,7 +99,7 @@ function AnalyzeReportCard() {
             toast({
                 variant: 'destructive',
                 title: 'Analysis Failed',
-                description: 'Something went wrong. Please try again.',
+                description: err.message || 'Something went wrong. Please try again.',
             });
         } finally {
             setLoading(false);
