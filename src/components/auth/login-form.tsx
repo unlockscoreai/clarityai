@@ -17,10 +17,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getAuth, sendSignInLinkToEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { app } from "@/lib/firebase/client";
-
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+import { auth } from "@/lib/firebase/client";
 
 const actionCodeSettings = {
   url: `${typeof window !== 'undefined' ? window.location.origin : ''}/finish-signup`,
@@ -71,6 +68,7 @@ export function LoginForm() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
+        const provider = new GoogleAuthProvider();
         await signInWithPopup(auth, provider);
         router.push('/finish-signup');
     } catch (error: any) {

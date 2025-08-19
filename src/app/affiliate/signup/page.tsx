@@ -4,9 +4,9 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestore';
-import { auth, provider, db } from '@/lib/firebase/client';
+import { auth, db } from '@/lib/firebase/client';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -43,6 +43,7 @@ function AffiliateSignupContent() {
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
+      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
