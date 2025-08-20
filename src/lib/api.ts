@@ -40,7 +40,7 @@ export async function createDispute(reportId: string, tenantId?: string) {
 }
 
 export async function getDispute(id: string) {
-  const res = await authFetch(`/disputes/status/${id}`);
+  const res = await authFetch(`/disputes/${id}`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
