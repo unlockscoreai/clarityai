@@ -1,52 +1,51 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helpers
-    function isSignedIn() {
-      return request.auth != null;
+    
+    // Users can read and write their own data.
+    match /users/{uid} {
+      allow read, update: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    //-------------------------------------
-    // Collections
-    //-------------------------------------
-
-    match /users/{userId} {
-      allow read, update: if isSignedIn() && isOwner(userId);
-      allow create: if isSignedIn();
-    }
-    
+    // Reports can only be read by the owner, and written by the server/API.
     match /reports/{reportId} {
-      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
-      allow create: if isSignedIn();
-    }
-    
-    match /letters/{letterId} {
-      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
-      allow create: if isSignedIn();
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false; 
     }
 
-    match /affiliates/{affiliateId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && isOwner(affiliateId);
-      
-      match /clients/{clientId} {
-         allow read, write, create: if isSignedIn() && isOwner(affiliateId);
-      }
+    // Disputes can only be read by the owner, and written by the server/API.
+     match /disputes/{disputeId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
     }
-    
+
+    // Letters can only be read by the owner, and written by the server/API.
+    match /letters/{letterId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    // Boosters are public information.
     match /creditBoosters/{boosterId} {
-        allow read: if true;
+      allow read: if true;
+      allow write: if false;
     }
     
+    // Affiliates can manage their own documents and subcollections.
+    match /affiliates/{affiliateId} {
+        allow read, write: if request.auth != null && request.auth.uid == affiliateId;
+        
+        match /clients/{clientId} {
+             allow read, write: if request.auth != null && request.auth.uid == affiliateId;
+        }
+    }
+    
+    // Affiliate stats are public for leaderboards.
     match /affiliateStats/{statId} {
         allow read: if true;
+        allow write: if false;
     }
   }
 }
