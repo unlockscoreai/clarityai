@@ -3,45 +3,48 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+  
+    // Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    // Users can read and update their own data, but not create or delete their doc.
-    // User creation is handled securely on the server or during signup.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    //-------------------------------------
+    // Collections
+    //-------------------------------------
+
     match /users/{userId} {
-      allow read, update: if request.auth.uid == userId;
-      allow create: if request.auth.uid != null;
+      allow read, update: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn();
     }
-
-    // Reports can be created by any authenticated user.
-    // Users can only read reports that belong to them.
+    
     match /reports/{reportId} {
-      allow create: if request.auth.uid != null;
-      allow read: if request.auth.uid == resource.data.userId;
+      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn();
     }
-
-    // Letters can be created by any authenticated user.
-    // Users can only read letters that belong to them.
+    
     match /letters/{letterId} {
-        allow create: if request.auth.uid != null;
-        allow read: if request.auth.uid == resource.data.userId;
-    }
-    
-    // Credit Boosters can be read by anyone.
-    match /creditBoosters/{boosterId} {
-      allow read: if true;
+      allow read, write: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow create: if isSignedIn();
     }
 
-    // Affiliate specific rules
     match /affiliates/{affiliateId} {
-        // An affiliate can read their own document
-        allow read: if request.auth.uid == affiliateId;
-        
-        // Affiliates can add clients to their own subcollection
-        match /clients/{clientId} {
-            allow read, create: if request.auth.uid == affiliateId;
-        }
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(affiliateId);
+      
+      match /clients/{clientId} {
+         allow read, write, create: if isSignedIn() && isOwner(affiliateId);
+      }
     }
     
-    // Public affiliate stats for the leaderboard
+    match /creditBoosters/{boosterId} {
+        allow read: if true;
+    }
+    
     match /affiliateStats/{statId} {
         allow read: if true;
     }
